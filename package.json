@@ -1,0 +1,15 @@
+{
+  "name": "express-pro",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "senapati484",
+  "license": "ISC",
+  "description": "This is express created by c for making express faster and more efficient",
+  "devDependencies": {
+    "node-gyp": "^12.2.0"
+  }
+}
