@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [18, 20]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache node-gyp and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.node-gyp
+            ~/.npm/_prebuilds
+            build/
+          key: ${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json', '**/binding.gyp') }}
+          restore-keys: |
+            ${{ runner.os }}-node${{ matrix.node-version }}-
+            ${{ runner.os }}-
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev clang-format
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install clang-format || true
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install llvm --version=17.0.6 --no-progress || true
+        shell: pwsh
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Run linter
+        if: runner.os != 'Windows'
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build native addon
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Upload build artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.platform }}-node${{ matrix.node-version }}
+          path: |
+            build/
+            npm-debug.log
+            yarn-error.log

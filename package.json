@@ -1,15 +1,41 @@
 {
   "name": "express-pro",
   "version": "1.0.0",
+  "description": "High-performance native HTTP server with platform-specific async I/O",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "types": "index.d.ts",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
-  "keywords": [],
+  "scripts": {
+    "build": "node-gyp rebuild",
+    "configure": "node-gyp configure",
+    "clean": "node-gyp clean",
+    "test": "node --test",
+    "bench": "bash benchmark/run.sh",
+    "lint": "clang-format --dry-run src/*.c && eslint js/ test/ examples/",
+    "lint:fix": "clang-format -i src/*.c && eslint js/ test/ benchmark/ examples/ --fix",
+    "prepare": "node -e \"require('fs').mkdirSync('.git/hooks', {recursive:true}); require('fs').copyFileSync('scripts/pre-commit', '.git/hooks/pre-commit'); require('fs').chmodSync('.git/hooks/pre-commit', 0o755);\" 2>/dev/null || true"
+  },
+  "keywords": [
+    "http",
+    "server",
+    "native",
+    "performance",
+    "io_uring",
+    "kqueue",
+    "iocp",
+    "napi"
+  ],
   "author": "senapati484",
   "license": "ISC",
-  "description": "This is express created by c for making express faster and more efficient",
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^25.5.0",
+    "eslint": "^9.39.4",
+    "globals": "^17.4.0",
+    "node-addon-api": "^8.7.0",
     "node-gyp": "^12.2.0"
   }
 }

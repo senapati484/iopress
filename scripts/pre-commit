@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Pre-commit hook for express-pro
+# Runs linting on staged files
+#
+
+echo "Running pre-commit checks..."
+
+# Check if any C/JS files are staged
+STAGED_C=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|h)$' || true)
+STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.js$' || true)
+
+# Run clang-format check on staged C files
+if [ -n "$STAGED_C" ]; then
+    echo "Checking C file formatting..."
+    for file in $STAGED_C; do
+        if [ -f "$file" ]; then
+            clang-format --dry-run --Werror "$file"
+            if [ $? -ne 0 ]; then
+                echo "Error: $file is not properly formatted"
+                echo "Run: clang-format -i $file"
+                exit 1
+            fi
+        fi
+    done
+fi
+
+# Run eslint on staged JS files
+if [ -n "$STAGED_JS" ]; then
+    echo "Checking JS linting..."
+    if command -v npx >/dev/null 2>&1; then
+        echo "$STAGED_JS" | xargs npx eslint
+        if [ $? -ne 0 ]; then
+            echo "Error: ESLint checks failed"
+            exit 1
+        fi
+    fi
+fi
+
+echo "Pre-commit checks passed!"
+exit 0
