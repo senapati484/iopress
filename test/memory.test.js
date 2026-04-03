@@ -1,5 +1,5 @@
 /**
- * ExpressMax Memory Leak Tests
+ * maxpress Memory Leak Tests
  *
  * Tests for memory stability under load.
  *

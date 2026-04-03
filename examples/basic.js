@@ -1,8 +1,8 @@
 /**
- * Basic Example - ExpressMax Hello World
+ * Basic Example - maxpress Hello World
  *
  * Demonstrates:
- * - Creating an ExpressMax application
+ * - Creating an maxpress application
  * - Simple GET and POST routes
  * - JSON response handling
  * - Starting the server
@@ -33,14 +33,14 @@ const maxpress = require('../index.js');
 // Create application
 const app = maxpress();
 
-console.log('ExpressMax v' + maxpress.version);
+console.log('maxpress v' + maxpress.version);
 console.log('Platform:', maxpress.platform);
 console.log('Backend:', maxpress.backend);
 
 // GET /
 app.get('/', (req, res) => {
   res.json({
-    message: 'Hello from ExpressMax!',
+    message: 'Hello from maxpress!',
     timestamp: Date.now(),
     platform: maxpress.platform,
     backend: maxpress.backend

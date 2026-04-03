@@ -1,5 +1,5 @@
 /**
- * ExpressMax Streaming Tests
+ * maxpress Streaming Tests
  *
  * Tests for streaming body handling with streamBody option.
  *

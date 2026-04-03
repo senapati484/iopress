@@ -1,4 +1,4 @@
-# ExpressMax
+# maxpress
 
 High-performance native HTTP server for Node.js with platform-specific async I/O. Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows) for maximum throughput with minimal latency.
 
@@ -102,9 +102,9 @@ app.listen(3000, () => {
 
 ## API Reference
 
-### ExpressMax(options?)
+### maxpress(options?)
 
-Creates a new ExpressMax application instance.
+Creates a new maxpress application instance.
 
 ```javascript
 const maxpress = require('maxpress');
@@ -425,7 +425,7 @@ app.post('/upload', (req, res) => {
 
 ### Backend Auto-Detection
 
-ExpressMax automatically selects the best available backend:
+maxpress automatically selects the best available backend:
 
 1. **Linux with kernel 5.1+**: Uses io_uring for maximum performance
 2. **macOS**: Uses kqueue for efficient event notification
@@ -441,7 +441,7 @@ console.log(maxpress.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 
 ## Migrating from Express
 
-ExpressMax is designed to be API-compatible with Express.js for common use cases.
+maxpress is designed to be API-compatible with Express.js for common use cases.
 
 ### What's Compatible
 
@@ -453,7 +453,7 @@ ExpressMax is designed to be API-compatible with Express.js for common use cases
 
 ### What's Different
 
-| Feature | Express.js | ExpressMax |
+| Feature | Express.js | maxpress |
 |---------|-----------|-------------|
 | Create app | `const app = express()` | `const app = maxpress()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
@@ -480,7 +480,7 @@ app.get('/api/users/:id', (req, res) => {
 app.listen(3000);
 ```
 
-**ExpressMax:**
+**maxpress:**
 ```javascript
 const maxpress = require('maxpress');
 const app = maxpress();
@@ -568,9 +568,9 @@ Results from AMD Ryzen 9 5900X, Node.js 20:
 
 | Server | Requests/sec | Latency (p99) |
 |--------|-------------|---------------|
-| ExpressMax (io_uring) | 520,000 | 0.8ms |
-| ExpressMax (kqueue) | 155,000 | 2.1ms |
-| ExpressMax (IOCP) | 105,000 | 3.5ms |
+| maxpress (io_uring) | 520,000 | 0.8ms |
+| maxpress (kqueue) | 155,000 | 2.1ms |
+| maxpress (IOCP) | 105,000 | 3.5ms |
 | Node.js http | 45,000 | 8.2ms |
 | Express.js | 18,000 | 22ms |
 | Fastify | 65,000 | 5.1ms |
@@ -611,4 +611,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-**Made with performance in mind.** If you find ExpressMax useful, please consider starring the repository on GitHub!
+**Made with performance in mind.** If you find maxpress useful, please consider starring the repository on GitHub!

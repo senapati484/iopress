@@ -389,7 +389,7 @@ class Response {
  * Main application class for creating HTTP servers with Express-compatible API.
  * Supports middleware, routing, error handling, and method chaining.
  *
- * @class ExpressMax
+ * @class maxpress
  * @since 1.0.0
  *
  * @example
@@ -414,9 +414,9 @@ class Response {
  * // Start server
  * app.listen(3000);
  */
-class ExpressMax {
+class Maxpress {
 /**
- * ExpressMax - High-Performance Native HTTP Server
+ * maxpress - High-Performance Native HTTP Server
  *
  * @module maxpress
  * @description A blazing fast native HTTP server that uses platform-specific
@@ -445,7 +445,7 @@ class ExpressMax {
    *
    * @param {string|Function} path - Path pattern or middleware function
    * @param {...Function} handlers - Middleware handler functions
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -482,7 +482,7 @@ class ExpressMax {
    *
    * @param {string} path - Route pattern (e.g., '/users/:id')
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -505,7 +505,7 @@ class ExpressMax {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -524,7 +524,7 @@ class ExpressMax {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -543,7 +543,7 @@ class ExpressMax {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -562,7 +562,7 @@ class ExpressMax {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -583,7 +583,7 @@ class ExpressMax {
    * send an error response.
    *
    * @param {Function} handler - Error handler function (err, req, res, next)
-   * @returns {ExpressMax} Returns this for method chaining
+   * @returns {maxpress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -846,13 +846,13 @@ class ExpressMax {
 }
 
 /**
- * Factory function to create an ExpressMax application.
+ * Factory function to create an maxpress application.
  *
- * Creates and returns a new ExpressMax application instance.
+ * Creates and returns a new maxpress application instance.
  * This is the default export and recommended way to create apps.
  *
  * @function maxpress
- * @returns {ExpressMax} New ExpressMax application instance
+ * @returns {maxpress} New maxpress application instance
  * @since 1.0.0
  *
  * @example
@@ -865,8 +865,8 @@ class ExpressMax {
  *
  * app.listen(3000);
  */
-function maxpress() {
-  return new ExpressMax();
+function createMaxpress() {
+  return new Maxpress();
 }
 
 /**
@@ -875,7 +875,7 @@ function maxpress() {
  * @since 1.0.0
  * @static
  */
-maxpress.version = native.version;
+createMaxpress.version = native.version;
 
 /**
  * Current platform identifier.
@@ -883,7 +883,7 @@ maxpress.version = native.version;
  * @since 1.0.0
  * @static
  */
-maxpress.platform = native.platform;
+createMaxpress.platform = native.platform;
 
 /**
  * Async I/O backend being used.
@@ -897,16 +897,14 @@ maxpress.platform = native.platform;
  * @since 1.0.0
  * @static
  */
-maxpress.backend = native.backend;
+createMaxpress.backend = native.backend;
 
 /**
- * ExpressMax Application Class.
- *
- * @type {typeof ExpressMax}
- * @since 1.0.0
+ * Alias to the Maxpress class.
+ * @type {typeof Maxpress}
  * @static
  */
-maxpress.maxpress = ExpressMax;
+createMaxpress.Maxpress = Maxpress;
 
 /**
  * Request Class.
@@ -915,7 +913,7 @@ maxpress.maxpress = ExpressMax;
  * @since 1.0.0
  * @static
  */
-maxpress.Request = Request;
+createMaxpress.Request = Request;
 
 /**
  * Response Class.
@@ -924,7 +922,7 @@ maxpress.Request = Request;
  * @since 1.0.0
  * @static
  */
-maxpress.Response = Response;
+createMaxpress.Response = Response;
 
 // Export module
-module.exports = maxpress;
+module.exports = createMaxpress;

@@ -1,5 +1,5 @@
 /**
- * ExpressMax Benchmark Regression Test
+ * maxpress Benchmark Regression Test
  *
  * Automated performance testing with autocannon.
  * Fails CI if req/s drops below platform-specific thresholds.

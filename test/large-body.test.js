@@ -1,5 +1,5 @@
 /**
- * ExpressMax Large Body Tests
+ * maxpress Large Body Tests
  *
  * Tests for maxBodySize handling and body buffering.
  *

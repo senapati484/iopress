@@ -1,5 +1,5 @@
 /**
- * ExpressMax Integration Tests
+ * maxpress Integration Tests
  *
  * Full stack tests using Node.js built-in test runner and native fetch.
  *
@@ -15,7 +15,7 @@ const maxpress = require('../js/index.js');
 const TEST_PORT = 3459;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
-describe('ExpressMax Integration Tests', () => {
+describe('maxpress Integration Tests', () => {
   let app;
   let server;
 
