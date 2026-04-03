@@ -171,6 +171,12 @@ static int parse_headers(const uint8_t* buffer, size_t len, char keys[][64],
   return count;
 }
 
+/* Reserved for future caching implementation - kept for API compatibility */
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
 static fast_path_cache_t* find_in_cache(const char* path, size_t path_len) {
   if (!cache_initialized) init_fast_cache();
 
@@ -186,6 +192,10 @@ static fast_path_cache_t* find_in_cache(const char* path, size_t path_len) {
 
   return NULL;
 }
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
 
 /* ============================================================================
  * C Request Handler (Called from server thread)
