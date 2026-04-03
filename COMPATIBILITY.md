@@ -3,7 +3,7 @@
 > **Version:** 1.0.0
 > **Target:** Express.js 4.x API compatibility with performance-first design
 
-This document defines the Express.js API compatibility surface for ExpressPro v1. Use it to assess migration feasibility from existing Express applications.
+This document defines the Express.js API compatibility surface for maxpress v1. Use it to assess migration feasibility from existing Express applications.
 
 ---
 
@@ -20,7 +20,7 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 
 ## Core Application API
 
-| Feature | Express 4 | ExpressPro v1 | Notes |
+| Feature | Express 4 | maxpress v1 | Notes |
 |---------|-----------|-----------------|-------|
 | `express()` / `maxpress()` | ✅ | ✅ | Factory function equivalent |
 | `app.use()` | ✅ | ✅ | Middleware mounting with path support |
@@ -40,9 +40,9 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 
 ## Request Object (`req`)
 
-| Property/Method | Express 4 | ExpressPro v1 | Notes |
+| Property/Method | Express 4 | maxpress v1 | Notes |
 |-----------------|-----------|-----------------|-------|
-| `req.app` | ✅ | ✅ | Reference to ExpressPro instance |
+| `req.app` | ✅ | ✅ | Reference to maxpress instance |
 | `req.baseUrl` | ✅ | ❌ | Router not supported |
 | `req.body` | ✅ | ✅ | **Behavioral Difference:** See [Body Parsing](#body-parsing) |
 | `req.cookies` | ✅ | ❌ | Use external `cookie-parser` (not bundled) |
@@ -75,9 +75,9 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 
 ## Response Object (`res`)
 
-| Property/Method | Express 4 | ExpressPro v1 | Notes |
+| Property/Method | Express 4 | maxpress v1 | Notes |
 |-----------------|-----------|-----------------|-------|
-| `res.app` | ✅ | ✅ | Reference to ExpressPro instance |
+| `res.app` | ✅ | ✅ | Reference to maxpress instance |
 | `res.headersSent` | ✅ | ✅ | Boolean, headers sent status |
 | `res.locals` | ✅ | ⚠️ | Partial - basic object only |
 | `res.append()` | ✅ | ✅ | Append header values |
@@ -106,7 +106,7 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 
 ## Middleware
 
-| Middleware | Express 4 | ExpressPro v1 | Notes |
+| Middleware | Express 4 | maxpress v1 | Notes |
 |------------|-----------|-----------------|-------|
 | `express.json()` | ✅ | ✅ | Built-in, see [Body Parsing](#body-parsing) |
 | `express.raw()` | ✅ | ❌ | Not implemented |
@@ -121,9 +121,9 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 
 ## Body Parsing
 
-**ExpressPro has different defaults optimized for performance:**
+**maxpress has different defaults optimized for performance:**
 
-| Aspect | Express 4 | ExpressPro v1 | Migration Note |
+| Aspect | Express 4 | maxpress v1 | Migration Note |
 |--------|-----------|---------------|----------------|
 | Default limit | 100KB | **4KB** | Increase via `maxBodySize` option |
 | JSON parsing | `express.json()` | Built-in | No separate middleware needed |
@@ -139,7 +139,7 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ExpressPro v1
+// maxpress v1
 const app = maxpress({
   maxBodySize: 10 * 1024 * 1024,  // 10MB
   streamBody: false               // Buffer entire body (default)
@@ -156,7 +156,7 @@ const app = maxpress({
 
 ## Error Handling
 
-| Pattern | Express 4 | ExpressPro v1 | Notes |
+| Pattern | Express 4 | maxpress v1 | Notes |
 |---------|-----------|---------------|-------|
 | `next(err)` | ✅ | ✅ | Propagate error to handlers |
 | `next('route')` | ✅ | ❌ | Skip to next route not supported |
@@ -167,7 +167,7 @@ const app = maxpress({
 
 ### Error Middleware in v1
 
-ExpressPro v1 supports error handling via `app.onError()`:
+maxpress v1 supports error handling via `app.onError()`:
 
 ```javascript
 // Express 4 - 4-argument error middleware
@@ -175,7 +175,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-// ExpressPro v1 - onError method
+// maxpress v1 - onError method
 app.onError((err, req, res) => {
   res.status(500).json({ error: err.message });
 });
@@ -187,7 +187,7 @@ app.onError((err, req, res) => {
 
 ## Explicitly Not Supported
 
-The following Express.js features are **explicitly out of scope** for ExpressPro v1:
+The following Express.js features are **explicitly out of scope** for maxpress v1:
 
 | Feature | Reason | Alternative |
 |---------|--------|-------------|
@@ -230,7 +230,7 @@ The following Express.js features are **explicitly out of scope** for ExpressPro
 
 ### 1. Response Chunking
 
-Express 4 automatically handles chunked encoding. ExpressPro v1 requires explicit streaming mode:
+Express 4 automatically handles chunked encoding. maxpress v1 requires explicit streaming mode:
 
 ```javascript
 // Express 4 - automatic chunking
@@ -238,7 +238,7 @@ res.write('chunk 1');
 res.write('chunk 2');
 res.end();
 
-// ExpressPro v1 - enable streaming
+// maxpress v1 - enable streaming
 app.get('/stream', (req, res) => {
   // Must set up streaming before first write
   res.streamData('chunk 1');
@@ -248,10 +248,10 @@ app.get('/stream', (req, res) => {
 
 ### 2. Header Case Sensitivity
 
-Express 4 lowercases header names internally. ExpressPro v1 preserves original casing:
+Express 4 lowercases header names internally. maxpress v1 preserves original casing:
 
 ```javascript
-// Both are equivalent in ExpressPro
+// Both are equivalent in maxpress
 res.set('Content-Type', 'application/json');
 res.set('content-type', 'application/json');
 
@@ -260,9 +260,9 @@ res.set('content-type', 'application/json');
 
 ### 3. Query String Parsing
 
-Express 4 uses `qs` library by default. ExpressPro v1 uses native `URLSearchParams`:
+Express 4 uses `qs` library by default. maxpress v1 uses native `URLSearchParams`:
 
-| Input | Express 4 | ExpressPro v1 |
+| Input | Express 4 | maxpress v1 |
 |-------|-----------|---------------|
 | `?foo[bar]=baz` | `{ foo: { bar: 'baz' } }` | `{ 'foo[bar]': 'baz' }` |
 | `?foo=1&foo=2` | `{ foo: ['1', '2'] }` | `{ foo: ['1', '2'] }` |
@@ -273,14 +273,14 @@ Express 4 uses `qs` library by default. ExpressPro v1 uses native `URLSearchPara
 ### 4. Route Matching Order
 
 Express 4: Routes added first are checked first (insertion order).
-ExpressPro v1: Same behavior, but path matching is faster (radix tree vs RegExp).
+maxpress v1: Same behavior, but path matching is faster (radix tree vs RegExp).
 
 ### 5. Path Normalization
 
 Express 4 normalizes paths (`/foo//bar` → `/foo/bar`).
-ExpressPro v1: Same normalization, but trailing slash handling differs:
+maxpress v1: Same normalization, but trailing slash handling differs:
 
-| Request | Express 4 | ExpressPro v1 |
+| Request | Express 4 | maxpress v1 |
 |---------|-----------|---------------|
 | `/users/` vs `/users` | Separate by default | Same route (configurable in v2) |
 

@@ -1,7 +1,7 @@
 #include "../include/server.h"
 #include <napi.h>
 
-namespace ExpressPro {
+namespace maxpress {
 
 const char* Server::GetBackendName() {
 #if defined(EXPRESS_PRO_HAS_IOURING)
@@ -28,4 +28,4 @@ Napi::Value Server::CreateServer(const Napi::CallbackInfo& info) {
   return server;
 }
 
-}  // namespace ExpressPro
+}  // namespace maxpress

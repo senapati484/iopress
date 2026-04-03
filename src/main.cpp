@@ -12,11 +12,11 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
   exports.Set(
       Napi::String::New(env, "backend"),
-      Napi::String::New(env, ExpressPro::Server::GetBackendName()));
+      Napi::String::New(env, maxpress::Server::GetBackendName()));
 
   exports.Set(
       Napi::String::New(env, "createServer"),
-      Napi::Function::New(env, ExpressPro::Server::CreateServer));
+      Napi::Function::New(env, maxpress::Server::CreateServer));
 
   return exports;
 }

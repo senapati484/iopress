@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-namespace ExpressPro {
+namespace maxpress {
 
 namespace Platform {
 
@@ -33,6 +33,6 @@ class KQueueServer {
 
 }  // namespace Platform
 
-}  // namespace ExpressPro
+}  // namespace maxpress
 
 #endif  // MACOS && KQUEUE

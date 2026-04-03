@@ -63,7 +63,7 @@ choco install llvm
 
 ```bash
 # Fork and clone
-git clone https://github.com/YOUR_USERNAME/maxpress.git
+git clone https://github.com/senapati484/maxpress.git
 cd maxpress
 
 # Install dependencies
