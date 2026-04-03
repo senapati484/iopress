@@ -1,20 +1,20 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const expresspro = require('../index.js');
+const expressmax = require('../index.js');
 
-describe('express-pro', () => {
+describe('expressmax', () => {
   it('should export version', () => {
-    assert.strictEqual(typeof expresspro.version, 'string');
+    assert.strictEqual(typeof expressmax.version, 'string');
   });
 
   it('should export platform', () => {
-    assert.strictEqual(typeof expresspro.platform, 'string');
-    assert.ok(['linux', 'mac', 'kqueue', 'windows', 'unknown'].includes(expresspro.platform));
+    assert.strictEqual(typeof expressmax.platform, 'string');
+    assert.ok(['linux', 'mac', 'kqueue', 'windows', 'unknown'].includes(expressmax.platform));
   });
 
   it('should export version', () => {
-    assert.strictEqual(typeof expresspro.version, 'string');
-    assert.strictEqual(expresspro.version, '1.0.0');
+    assert.strictEqual(typeof expressmax.version, 'string');
+    assert.strictEqual(expressmax.version, '1.0.0');
   });
 
   it('should have native functions', () => {

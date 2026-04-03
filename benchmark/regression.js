@@ -1,5 +1,5 @@
 /**
- * Express-Pro Benchmark Regression Test
+ * ExpressMax Benchmark Regression Test
  *
  * Automated performance testing with autocannon.
  * Fails CI if req/s drops below platform-specific thresholds.
@@ -10,7 +10,7 @@
 'use strict';
 
 const http = require('http');
-const expresspro = require('../js/index.js');
+const expressmax = require('../js/index.js');
 
 // Platform detection
 const platform = process.platform;
@@ -196,7 +196,7 @@ async function main() {
 
   // Create app and start server
   log('Starting server...', 'blue');
-  const app = expresspro();
+  const app = expressmax();
 
   // Try to register fast route for /health (bypasses JavaScript entirely)
   const native = require('../build/Release/express_pro_native');

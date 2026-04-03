@@ -1,5 +1,5 @@
 /**
- * Express-Pro Integration Tests
+ * ExpressMax Integration Tests
  *
  * Full stack tests using Node.js built-in test runner and native fetch.
  *
@@ -10,18 +10,18 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const expresspro = require('../js/index.js');
+const expressmax = require('../js/index.js');
 
 const TEST_PORT = 3459;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
-describe('Express-Pro Integration Tests', () => {
+describe('ExpressMax Integration Tests', () => {
   let app;
   let server;
 
   // Setup: Create app and start server before all tests
   before(async () => {
-    app = expresspro();
+    app = expressmax();
 
     // Health check endpoint
     app.get('/health', (req, res) => {
@@ -331,13 +331,13 @@ describe('Express-Pro Integration Tests', () => {
 
   describe('Server Info', () => {
     it('should expose version', () => {
-      assert.strictEqual(typeof expresspro.version, 'string');
-      assert.ok(expresspro.version.length > 0);
+      assert.strictEqual(typeof expressmax.version, 'string');
+      assert.ok(expressmax.version.length > 0);
     });
 
     it('should expose platform', () => {
-      assert.strictEqual(typeof expresspro.platform, 'string');
-      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(expresspro.platform));
+      assert.strictEqual(typeof expressmax.platform, 'string');
+      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(expressmax.platform));
     });
   });
 });

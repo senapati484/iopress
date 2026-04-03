@@ -1,8 +1,8 @@
 /**
- * Basic Example - Express-Pro Hello World
+ * Basic Example - ExpressMax Hello World
  *
  * Demonstrates:
- * - Creating an Express-Pro application
+ * - Creating an ExpressMax application
  * - Simple GET and POST routes
  * - JSON response handling
  * - Starting the server
@@ -28,22 +28,22 @@
 
 'use strict';
 
-const expresspro = require('../index.js');
+const expressmax = require('../index.js');
 
 // Create application
-const app = expresspro();
+const app = expressmax();
 
-console.log('Express-Pro v' + expresspro.version);
-console.log('Platform:', expresspro.platform);
-console.log('Backend:', expresspro.backend);
+console.log('ExpressMax v' + expressmax.version);
+console.log('Platform:', expressmax.platform);
+console.log('Backend:', expressmax.backend);
 
 // GET /
 app.get('/', (req, res) => {
   res.json({
-    message: 'Hello from Express-Pro!',
+    message: 'Hello from ExpressMax!',
     timestamp: Date.now(),
-    platform: expresspro.platform,
-    backend: expresspro.backend
+    platform: expressmax.platform,
+    backend: expressmax.backend
   });
 });
 

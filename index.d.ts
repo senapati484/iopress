@@ -226,9 +226,9 @@ declare namespace ExpressPro {
  * @param options Configuration options
  * @returns ExpressPro application instance
  */
-declare function expresspro(options?: ExpressPro.ExpressProOptions): ExpressPro.ExpressProClass;
+declare function expressmax(options?: ExpressPro.ExpressProOptions): ExpressPro.ExpressProClass;
 
-declare namespace expresspro {
+declare namespace expressmax {
   export const version: string;
   export const platform: string;
   export const backend: string;
@@ -237,4 +237,4 @@ declare namespace expresspro {
   export const Response: typeof ExpressPro.Response;
 }
 
-export = expresspro;
+export = expressmax;

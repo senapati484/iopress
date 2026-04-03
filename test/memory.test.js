@@ -1,5 +1,5 @@
 /**
- * Express-Pro Memory Leak Tests
+ * ExpressMax Memory Leak Tests
  *
  * Tests for memory stability under load.
  *
@@ -11,7 +11,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
-const expresspro = require('../js/index.js');
+const expressmax = require('../js/index.js');
 
 const TEST_PORT = 3462;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -48,7 +48,7 @@ describe('Memory Leak Tests', () => {
   let server;
 
   before(async () => {
-    app = expresspro();
+    app = expressmax();
 
     // Various endpoints for testing
     app.get('/health', (req, res) => {

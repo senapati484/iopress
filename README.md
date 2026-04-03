@@ -58,10 +58,10 @@ npm install expressmax
 ## Quickstart
 
 ```javascript
-const expresspro = require('expressmax');
+const expressmax = require('expressmax');
 
 // Create application instance
-const app = expresspro();
+const app = expressmax();
 
 // Middleware support
 app.use((req, res, next) => {
@@ -110,10 +110,10 @@ Creates a new ExpressMax application instance.
 const expressmax = require('expressmax');
 
 // Default options
-const app = expresspro();
+const app = expressmax();
 
 // With custom options
-const app = expresspro({
+const app = expressmax({
   initialBufferSize: 32768,
   maxBodySize: 5242880,  // 5MB
   streamBody: false
@@ -347,11 +347,11 @@ res.end('Final chunk');
 ### Module Properties
 
 ```javascript
-const expresspro = require('expressmax');
+const expressmax = require('expressmax');
 
-console.log(expresspro.version);   // '1.0.0'
-console.log(expresspro.platform);  // 'linux', 'darwin', 'win32'
-console.log(expresspro.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
+console.log(expressmax.version);   // '1.0.0'
+console.log(expressmax.platform);  // 'linux', 'darwin', 'win32'
+console.log(expressmax.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
 ```
 
 ## Configuration Options
@@ -371,7 +371,7 @@ Increase this value if:
 
 ```javascript
 // For APIs with large headers (JWT tokens, etc.)
-const app = expresspro({
+const app = expressmax({
   initialBufferSize: 65536  // 64KB
 });
 ```
@@ -385,7 +385,7 @@ Increase this value if:
 
 ```javascript
 // For file upload server
-const app = expresspro({
+const app = expressmax({
   maxBodySize: 50 * 1024 * 1024  // 50MB
 });
 ```
@@ -402,7 +402,7 @@ Enable streaming if:
 
 ```javascript
 // For streaming/proxy use cases
-const app = expresspro({
+const app = expressmax({
   streamBody: true,
   maxBodySize: 100 * 1024 * 1024  // Still needed for max protection
 });
@@ -435,8 +435,8 @@ Express-Pro automatically selects the best available backend:
 ### Checking Your Backend
 
 ```javascript
-const app = expresspro();
-console.log(expresspro.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
+const app = expressmax();
+console.log(expressmax.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 ```
 
 ## Migrating from Express
@@ -455,7 +455,7 @@ Express-Pro is designed to be API-compatible with Express.js for common use case
 
 | Feature | Express.js | Express-Pro |
 |---------|-----------|-------------|
-| Create app | `const app = express()` | `const app = expresspro()` |
+| Create app | `const app = express()` | `const app = expressmax()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
 | Static files | `express.static()` | Not included (use nginx/CDN) |
 | View engine | Built-in | Not included (API-focused) |
@@ -482,8 +482,8 @@ app.listen(3000);
 
 **Express-Pro:**
 ```javascript
-const expresspro = require('expressmax');
-const app = expresspro();
+const expressmax = require('expressmax');
+const app = expressmax();
 
 // No need for express.json() - body parsing is built-in
 

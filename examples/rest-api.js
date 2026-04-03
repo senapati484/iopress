@@ -42,9 +42,9 @@
 
 'use strict';
 
-const expresspro = require('../index.js');
+const expressmax = require('../index.js');
 
-const app = expresspro();
+const app = expressmax();
 
 // In-memory data store
 const users = new Map();

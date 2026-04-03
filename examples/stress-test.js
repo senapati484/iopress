@@ -14,10 +14,10 @@
 
 'use strict';
 
-const expresspro = require('../index.js');
+const expressmax = require('../index.js');
 const http = require('http');
 
-const app = expresspro();
+const app = expressmax();
 
 // Stats tracking
 let stats = {
@@ -48,7 +48,7 @@ app.get('/health', (req, res) => {
     status: 'healthy',
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    platform: expresspro.platform
+    platform: expressmax.platform
   });
 });
 
@@ -359,8 +359,8 @@ async function runPostTest() {
 async function runAllTests() {
   console.log('='.repeat(60));
   console.log('Express-Pro Stress Test');
-  console.log('Platform:', expresspro.platform);
-  console.log('Backend:', expresspro.backend);
+  console.log('Platform:', expressmax.platform);
+  console.log('Backend:', expressmax.backend);
   console.log('Configuration:');
   console.log(`  - Port: ${PORT}`);
   console.log(`  - Concurrency: ${CONCURRENCY}`);
