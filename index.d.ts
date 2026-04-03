@@ -8,7 +8,7 @@
 import { Buffer } from 'node:buffer';
 
 declare namespace maxpress {
-  interface ExpressMaxOptions {
+  interface maxpressOptions {
     /** Initial buffer size for request/response handling (default: 16384) */
     initialBufferSize?: number;
     /** Maximum allowed body size in bytes (default: 1048576 = 1MB) */

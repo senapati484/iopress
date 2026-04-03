@@ -5,13 +5,13 @@
 
 #include "common.h"
 
-namespace ExpressPro {
+namespace maxpress {
   class Server {
   public:
     static const char* GetBackendName();
     static Napi::Value CreateServer(const Napi::CallbackInfo& info);
   };
 
-}  // namespace ExpressPro
+}  // namespace maxpress
 
 #endif  // EXPRESS_PRO_SERVER_H_
