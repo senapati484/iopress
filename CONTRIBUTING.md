@@ -342,7 +342,7 @@ static int process_http_request(client_t *client) {
  * Creates a new Application instance
  * @param {Object} [options] - Configuration options
  * @param {number} [options.maxBodySize=1048576] - Maximum body size in bytes
- * @returns {Application} Express-pro application instance
+ * @returns {Application} maxpress application instance
  */
 function createApplication(options = {}) {
     'use strict';

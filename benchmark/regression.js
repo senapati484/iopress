@@ -186,7 +186,7 @@ function printResults(results, threshold) {
 async function main() {
   log('');
   log('╔════════════════════════════════════════════════════════════╗', 'cyan');
-  log('║     EXPRESS-PRO BENCHMARK REGRESSION TEST                ║', 'cyan');
+  log('║     MAXPRESS BENCHMARK REGRESSION TEST                    ║', 'cyan');
   log('╚════════════════════════════════════════════════════════════╝', 'cyan');
   log('');
 
