@@ -1,5 +1,5 @@
 /**
- * norvex Streaming Tests
+ * iopress Streaming Tests
  *
  * Tests for streaming body handling with streamBody option.
  *
@@ -10,7 +10,7 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const norvex = require('../js/index.js');
+const iopress = require('../js/index.js');
 
 const TEST_PORT = 3461;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -23,7 +23,7 @@ describe('Streaming Body Tests', () => {
   let streamEnded;
 
   before(async () => {
-    app = norvex();
+    app = iopress();
     chunksReceived = [];
     totalBytes = 0;
     streamEnded = false;

@@ -14,10 +14,10 @@
 
 'use strict';
 
-const norvex = require('../index.js');
+const iopress = require('../index.js');
 const http = require('http');
 
-const app = norvex();
+const app = iopress();
 
 // Stats tracking
 let stats = {
@@ -48,7 +48,7 @@ app.get('/health', (req, res) => {
     status: 'healthy',
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    platform: norvex.platform
+    platform: iopress.platform
   });
 });
 
@@ -358,9 +358,9 @@ async function runPostTest() {
 // Run all tests
 async function runAllTests() {
   console.log('='.repeat(60));
-  console.log('norvex Stress Test');
-  console.log('Platform:', norvex.platform);
-  console.log('Backend:', norvex.backend);
+  console.log('iopress Stress Test');
+  console.log('Platform:', iopress.platform);
+  console.log('Backend:', iopress.backend);
   console.log('Configuration:');
   console.log(`  - Port: ${PORT}`);
   console.log(`  - Concurrency: ${CONCURRENCY}`);

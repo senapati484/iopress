@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Pre-commit hook for norvex
+# Pre-commit hook for iopress
 # Runs linting on staged files
 #
 

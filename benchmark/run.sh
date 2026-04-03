@@ -2,7 +2,7 @@
 
 set -e
 
-echo "=== norvex Benchmark ==="
+echo "=== iopress Benchmark ==="
 echo "Platform: $(uname -s)"
 echo "Node: $(node --version)"
 echo ""

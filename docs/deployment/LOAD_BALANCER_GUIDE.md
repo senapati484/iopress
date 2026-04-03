@@ -27,13 +27,13 @@ Traditional Setup: 3-4 Node processes load balanced
 - Additional hop latency (~0.5-2ms)
 - Operational complexity
 
-## norvex Solution
+## iopress Solution
 
-With norvex's native performance, a **single process** can often replace multiple Node.js processes:
+With iopress's native performance, a **single process** can often replace multiple Node.js processes:
 
 ```
 ┌─────────────┐         ┌─────────────┐
-│   Client    │────────▶│ norvex │
+│   Client    │────────▶│ iopress │
 │             │         │  (1 process)  │
 └─────────────┘         └─────────────┘
         │                        │
@@ -42,7 +42,7 @@ With norvex's native performance, a **single process** can often replace multipl
 
 ## Performance Comparison by Platform
 
-| Platform | norvex | Express.js | Ratio |
+| Platform | iopress | Express.js | Ratio |
 |----------|-------------|------------|-------|
 | **Linux (io_uring)** | **300k-500k req/s** | ~15k req/s | **20-33x** |
 | macOS (kqueue) | ~80k req/s | ~15k req/s | 5x |
@@ -52,11 +52,11 @@ With norvex's native performance, a **single process** can often replace multipl
 
 ### Single Server Scenarios
 
-If your traffic is under **300k req/s**, a single norvex instance on Linux can handle it:
+If your traffic is under **300k req/s**, a single iopress instance on Linux can handle it:
 
 ```javascript
 // Single process handling 300k req/s
-const app = norvex();
+const app = iopress();
 app.listen(80);  // That's it!
 ```
 
@@ -107,7 +107,7 @@ Use when:
 
 ### 2. Static File Serving
 
-norvex is optimized for API requests. For static files, use nginx:
+iopress is optimized for API requests. For static files, use nginx:
 
 ```nginx
 server {
@@ -119,7 +119,7 @@ server {
     }
     
     location /api/ {
-        # Proxy to norvex
+        # Proxy to iopress
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -129,7 +129,7 @@ server {
 
 ### 3. SSL/TLS Termination
 
-Until norvex v2 adds native HTTPS:
+Until iopress v2 adds native HTTPS:
 
 ```nginx
 server {
@@ -155,12 +155,12 @@ wrk -t4 -c400 -d30s http://your-api/endpoint
 # Note current: requests/sec, latency p99
 ```
 
-### Step 2: Deploy norvex
+### Step 2: Deploy iopress
 
 ```javascript
 // server.js
-const norvex = require('norvex');
-const app = norvex();
+const iopress = require('iopress');
+const app = iopress();
 
 // Your routes here
 app.get('/api/users', (req, res) => {
@@ -179,7 +179,7 @@ app.listen(3000, () => {
 ### Step 3: Performance Test
 
 ```bash
-# Test norvex single instance
+# Test iopress single instance
 wrk -t4 -c400 -d30s http://localhost:3000/api/users
 
 # Expected: 10-20x improvement over Express
@@ -188,8 +188,8 @@ wrk -t4 -c400 -d30s http://localhost:3000/api/users
 ### Step 4: Gradual Migration
 
 ```
-Phase 1: Deploy norvex alongside existing setup
-Phase 2: Route 10% traffic to norvex
+Phase 1: Deploy iopress alongside existing setup
+Phase 2: Route 10% traffic to iopress
 Phase 3: Monitor for 24h
 Phase 4: Route 100% traffic
 Phase 5: Remove load balancer (if single server)
@@ -206,7 +206,7 @@ Phase 5: Remove load balancer (if single server)
 | Operational complexity | High |
 | **Total** | **$200/month** |
 
-### After (norvex)
+### After (iopress)
 
 | Component | Cost/Month |
 |-----------|-----------|
@@ -219,7 +219,7 @@ Phase 5: Remove load balancer (if single server)
 
 ## Kubernetes Deployment
 
-### Without norvex (Traditional)
+### Without iopress (Traditional)
 
 ```yaml
 apiVersion: apps/v1
@@ -248,7 +248,7 @@ spec:
   - port: 80
 ```
 
-### With norvex
+### With iopress
 
 ```yaml
 apiVersion: apps/v1
@@ -260,8 +260,8 @@ spec:
   template:
     spec:
       containers:
-      - name: norvex
-        image: norvex:latest
+      - name: iopress
+        image: iopress:latest
         resources:
           requests:
             memory: "256Mi"
@@ -304,9 +304,9 @@ setInterval(() => {
 
 | Traffic | Recommendation |
 |---------|---------------|
-| < 50k req/s | Single norvex process, no load balancer |
-| 50k-300k req/s | Single norvex process, monitor closely |
-| 300k+ req/s | Multiple norvex instances with load balancer |
+| < 50k req/s | Single iopress process, no load balancer |
+| 50k-300k req/s | Single iopress process, monitor closely |
+| 300k+ req/s | Multiple iopress instances with load balancer |
 | Global/multi-region | Multiple servers with geographic LB |
 
-**Bottom line:** norvex eliminates load balancers for 95% of use cases!
+**Bottom line:** iopress eliminates load balancers for 95% of use cases!

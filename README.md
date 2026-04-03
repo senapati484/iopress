@@ -1,4 +1,4 @@
-# norvex
+# iopress
 
 High-performance native HTTP server for Node.js with platform-specific async I/O. Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows) for maximum throughput with minimal latency.
 
@@ -30,7 +30,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ## Installation
 
 ```bash
-npm install norvex
+npm install iopress
 ```
 
 ### Platform Prerequisites
@@ -58,10 +58,10 @@ npm install norvex
 ## Quickstart
 
 ```javascript
-const norvex = require('norvex');
+const iopress = require('iopress');
 
 // Create application instance
-const app = norvex();
+const app = iopress();
 
 // Middleware support
 app.use((req, res, next) => {
@@ -102,18 +102,18 @@ app.listen(3000, () => {
 
 ## API Reference
 
-### norvex(options?)
+### iopress(options?)
 
-Creates a new norvex application instance.
+Creates a new iopress application instance.
 
 ```javascript
-const norvex = require('norvex');
+const iopress = require('iopress');
 
 // Default options
-const app = norvex();
+const app = iopress();
 
 // With custom options
-const app = norvex({
+const app = iopress({
   initialBufferSize: 32768,
   maxBodySize: 5242880,  // 5MB
   streamBody: false
@@ -347,11 +347,11 @@ res.end('Final chunk');
 ### Module Properties
 
 ```javascript
-const norvex = require('norvex');
+const iopress = require('iopress');
 
-console.log(norvex.version);   // '1.0.0'
-console.log(norvex.platform);  // 'linux', 'darwin', 'win32'
-console.log(norvex.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
+console.log(iopress.version);   // '1.0.0'
+console.log(iopress.platform);  // 'linux', 'darwin', 'win32'
+console.log(iopress.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
 ```
 
 ## Configuration Options
@@ -371,7 +371,7 @@ Increase this value if:
 
 ```javascript
 // For APIs with large headers (JWT tokens, etc.)
-const app = norvex({
+const app = iopress({
   initialBufferSize: 65536  // 64KB
 });
 ```
@@ -385,7 +385,7 @@ Increase this value if:
 
 ```javascript
 // For file upload server
-const app = norvex({
+const app = iopress({
   maxBodySize: 50 * 1024 * 1024  // 50MB
 });
 ```
@@ -402,7 +402,7 @@ Enable streaming if:
 
 ```javascript
 // For streaming/proxy use cases
-const app = norvex({
+const app = iopress({
   streamBody: true,
   maxBodySize: 100 * 1024 * 1024  // Still needed for max protection
 });
@@ -425,7 +425,7 @@ app.post('/upload', (req, res) => {
 
 ### Backend Auto-Detection
 
-norvex automatically selects the best available backend:
+iopress automatically selects the best available backend:
 
 1. **Linux with kernel 5.1+**: Uses io_uring for maximum performance
 2. **macOS**: Uses kqueue for efficient event notification
@@ -435,13 +435,13 @@ norvex automatically selects the best available backend:
 ### Checking Your Backend
 
 ```javascript
-const app = norvex();
-console.log(norvex.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
+const app = iopress();
+console.log(iopress.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 ```
 
 ## Migrating from Express
 
-norvex is designed to be API-compatible with Express.js for common use cases.
+iopress is designed to be API-compatible with Express.js for common use cases.
 
 ### What's Compatible
 
@@ -453,9 +453,9 @@ norvex is designed to be API-compatible with Express.js for common use cases.
 
 ### What's Different
 
-| Feature | Express.js | norvex |
+| Feature | Express.js | iopress |
 |---------|-----------|-------------|
-| Create app | `const app = express()` | `const app = norvex()` |
+| Create app | `const app = express()` | `const app = iopress()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
 | Static files | `express.static()` | Not included (use nginx/CDN) |
 | View engine | Built-in | Not included (API-focused) |
@@ -480,10 +480,10 @@ app.get('/api/users/:id', (req, res) => {
 app.listen(3000);
 ```
 
-**norvex:**
+**iopress:**
 ```javascript
-const norvex = require('norvex');
-const app = norvex();
+const iopress = require('iopress');
+const app = iopress();
 
 // No need for express.json() - body parsing is built-in
 
@@ -509,8 +509,8 @@ app.listen(3000);
 
 ```bash
 # Clone the repository
-git clone https://github.com/senapati484/norvex.git
-cd norvex
+git clone https://github.com/senapati484/iopress.git
+cd iopress
 
 # Install dependencies
 npm install
@@ -568,9 +568,9 @@ Results from AMD Ryzen 9 5900X, Node.js 20:
 
 | Server | Requests/sec | Latency (p99) |
 |--------|-------------|---------------|
-| norvex (io_uring) | 520,000 | 0.8ms |
-| norvex (kqueue) | 155,000 | 2.1ms |
-| norvex (IOCP) | 105,000 | 3.5ms |
+| iopress (io_uring) | 520,000 | 0.8ms |
+| iopress (kqueue) | 155,000 | 2.1ms |
+| iopress (IOCP) | 105,000 | 3.5ms |
 | Node.js http | 45,000 | 8.2ms |
 | Express.js | 18,000 | 22ms |
 | Fastify | 65,000 | 5.1ms |
@@ -611,4 +611,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-**Made with performance in mind.** If you find norvex useful, please consider starring the repository on GitHub!
+**Made with performance in mind.** If you find iopress useful, please consider starring the repository on GitHub!

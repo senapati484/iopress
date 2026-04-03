@@ -18,13 +18,13 @@
 #include <cstdint>
 #include <string>
 
-namespace norvex {
+namespace iopress {
   struct ServerConfig {
     uint16_t port = 8080;
     std::string host = "0.0.0.0";
     int backlog = 511;
   };
 
-}  // namespace norvex
+}  // namespace iopress
 
 #endif  // EXPRESS_PRO_COMMON_H_

@@ -23,7 +23,7 @@ Paste it at the top of the next prompt as context. This prevents context drift a
 ### P1.1 — Initialize Project Structure
 
 **Role/Context:** You are a senior Node.js native addon engineer scaffolding a new open-source module.  
-**Objective:** Create the full directory tree, `package.json`, `.gitignore`, and `binding.gyp` for a cross-platform Node.js native addon called `norvex`.  
+**Objective:** Create the full directory tree, `package.json`, `.gitignore`, and `binding.gyp` for a cross-platform Node.js native addon called `ioexpress`.  
 **Expected Output:** Shell commands + file contents ready to run.
 
 **Inputs/Assumptions:**
@@ -114,7 +114,7 @@ Paste it at the top of the next prompt as context. This prevents context drift a
 - [ ] Export default `expressPro()` factory function
 - [ ] Add `"types": "index.d.ts"` to `package.json`
 
-**Expected outcome:** A TypeScript project can `import ExpressPro from 'norvex'` with full autocomplete.
+**Expected outcome:** A TypeScript project can `import ExpressPro from 'ioexpress'` with full autocomplete.
 
 ---
 
@@ -338,7 +338,7 @@ binding.Listen(3000, {});
 
 **Acceptance criteria:**
 ```javascript
-const app = require('norvex')();
+const app = require('ioexpress')();
 app.use((req, res, next) => { req.start = Date.now(); next(); });
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.listen(3000, () => console.log('ready'));
@@ -502,7 +502,7 @@ app.listen(3000, () => console.log('ready'));
 
 **Sections to include:**
 - [ ] Hero: benchmark numbers table (from PLAN.md expected results)
-- [ ] Install: `npm install norvex` + platform prerequisites (liburing on Linux)
+- [ ] Install: `npm install ioexpress` + platform prerequisites (liburing on Linux)
 - [ ] Quickstart: 10-line working example
 - [ ] API Reference: all methods with signatures and examples
 - [ ] Options: `initialBufferSize`, `maxBodySize`, `streamBody` — when and why to change each
@@ -554,7 +554,7 @@ app.listen(3000, () => console.log('ready'));
 **Expected Output:** `MIGRATION.md`
 
 **Checklist:**
-- [ ] Step 1: Replace `require('express')` with `require('norvex')`
+- [ ] Step 1: Replace `require('express')` with `require('ioexpress')`
 - [ ] Show: what works identically (routes, middleware, `res.json`, `req.params`)
 - [ ] Show: what needs change (`express.static` → serve files manually or use a CDN)
 - [ ] Show: what doesn't exist yet (template engines, `res.render`, cookies)
@@ -620,7 +620,7 @@ app.listen(3000, () => console.log('ready'));
 - [ ] `install` script: `node-pre-gyp install --fallback-to-build`
 - [ ] Test: `npm install` on a machine without build tools succeeds by downloading prebuilt
 
-**Expected outcome:** `npm install norvex` works on Linux/macOS/Windows without compiler installed.
+**Expected outcome:** `npm install ioexpress` works on Linux/macOS/Windows without compiler installed.
 
 ---
 

@@ -1,7 +1,7 @@
 {
-  "name": "norvex",
-  "version": "1.0.0",
-  "description": "High-performance native HTTP server - 8x faster than Express.js",
+  "name": "@sayansenapati/iopress",
+  "version": "0.0.1",
+  "description": "Ultra-fast HTTP framework powered by io_uring and C native addons. 30x faster than Express.",
   "main": "index.js",
   "types": "index.d.ts",
   "engines": {
@@ -42,12 +42,12 @@
     "iocp",
     "napi"
   ],
-  "author": "senapati484 <senapati484@example.com>",
+  "author": "senapati484 <sayansenapati2544@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/senapati484/norvex#readme",
+  "homepage": "https://github.com/senapati484/iopress#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/senapati484/norvex.git"
+    "url": "https://github.com/senapati484/iopress.git"
   },
   "dependencies": {},
   "devDependencies": {

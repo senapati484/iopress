@@ -44,7 +44,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const norvex = require('../index.js');
+const iopress = require('../index.js');
 
 // Upload storage directory
 const UPLOAD_DIR = path.join(__dirname, '../tmp/uploads');
@@ -55,7 +55,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 // Create app with streaming enabled for large bodies
-const app = norvex({
+const app = iopress({
   streamBody: true,        // Enable streaming mode
   maxBodySize: 100 * 1024 * 1024,  // 100MB max
   initialBufferSize: 16384 // 16KB buffer

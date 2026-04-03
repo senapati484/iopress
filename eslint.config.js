@@ -38,6 +38,30 @@ module.exports = [
     }
   },
   {
+    files: ['test/**/*.js', 'benchmark/**/*.js', 'scripts/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      globals: {
+        ...globals.node,
+        ...globals.es2022,
+        describe: 'readonly',
+        it: 'readonly',
+        before: 'readonly',
+        after: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        global: 'readonly'
+      }
+    },
+    rules: {
+      'no-unused-vars': ['warn', { 
+        'argsIgnorePattern': '^_', 
+        'varsIgnorePattern': '^_'
+      }]
+    }
+  },
+  {
     ignores: ['eslint.config.js']
   }
 ];

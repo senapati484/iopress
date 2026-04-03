@@ -1,5 +1,5 @@
 /**
- * norvex - High-performance native HTTP server
+ * iopress - High-performance native HTTP server
  * TypeScript declarations
  */
 
@@ -7,8 +7,8 @@
 
 import { Buffer } from 'node:buffer';
 
-declare namespace norvex {
-  interface norvexOptions {
+declare namespace iopress {
+  interface iopressOptions {
     /** Initial buffer size for request/response handling (default: 16384) */
     initialBufferSize?: number;
     /** Maximum allowed body size in bytes (default: 1048576 = 1MB) */
@@ -132,7 +132,7 @@ declare namespace norvex {
     backend: string;
   }
 
-  class norvexClass {
+  class iopressClass {
     /** Module version */
     readonly version: string;
     /** Current platform (linux, macos, windows) */
@@ -140,7 +140,7 @@ declare namespace norvex {
     /** Async I/O backend being used */
     readonly backend: string;
 
-    constructor(options?: norvexOptions);
+    constructor(options?: iopressOptions);
 
     /**
      * Register middleware for all routes
@@ -222,19 +222,19 @@ declare namespace norvex {
 }
 
 /**
- * Create norvex application instance
+ * Create iopress application instance
  * @param options Configuration options
- * @returns norvex application instance
+ * @returns iopress application instance
  */
-declare function norvex(options?: norvex.norvexOptions): norvex.norvexClass;
+declare function iopress(options?: iopress.iopressOptions): iopress.iopressClass;
 
-declare namespace norvex {
+declare namespace iopress {
   export const version: string;
   export const platform: string;
   export const backend: string;
-  export const norvex: typeof norvex.norvexClass;
-  export const Request: typeof norvex.Request;
-  export const Response: typeof norvex.Response;
+  export const iopress: typeof iopress.iopressClass;
+  export const Request: typeof iopress.Request;
+  export const Response: typeof iopress.Response;
 }
 
-export = norvex;
+export = iopress;

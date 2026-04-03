@@ -1,20 +1,20 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const norvex = require('../index.js');
+const iopress = require('../index.js');
 
-describe('norvex', () => {
+describe('iopress', () => {
   it('should export version', () => {
-    assert.strictEqual(typeof norvex.version, 'string');
+    assert.strictEqual(typeof iopress.version, 'string');
   });
 
   it('should export platform', () => {
-    assert.strictEqual(typeof norvex.platform, 'string');
-    assert.ok(['linux', 'mac', 'kqueue', 'windows', 'unknown'].includes(norvex.platform));
+    assert.strictEqual(typeof iopress.platform, 'string');
+    assert.ok(['linux', 'mac', 'kqueue', 'windows', 'unknown'].includes(iopress.platform));
   });
 
   it('should export version', () => {
-    assert.strictEqual(typeof norvex.version, 'string');
-    assert.strictEqual(norvex.version, '1.0.0');
+    assert.strictEqual(typeof iopress.version, 'string');
+    assert.strictEqual(iopress.version, '1.0.0');
   });
 
   it('should have native functions', () => {

@@ -1,5 +1,5 @@
 /**
- * norvex N-API Binding
+ * iopress N-API Binding
  *
  * Bridge between JavaScript and the native HTTP server.
  * Handles thread-safe communication using napi_threadsafe_function.
@@ -575,7 +575,7 @@ napi_value Listen(napi_env env, napi_callback_info info) {
 
   /* Create thread-safe function */
   napi_value async_resource_name;
-  napi_create_string_utf8(env, "norvex", NAPI_AUTO_LENGTH,
+  napi_create_string_utf8(env, "iopress", NAPI_AUTO_LENGTH,
                           &async_resource_name);
 
   napi_threadsafe_function tsfn;

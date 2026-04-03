@@ -95,5 +95,5 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ---
 
-[unreleased]: https://github.com/senapati484/norvex/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/senapati484/norvex/releases/tag/v1.0.0
+[unreleased]: https://github.com/senapati484/iopress/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/senapati484/iopress/releases/tag/v1.0.0

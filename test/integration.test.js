@@ -1,5 +1,5 @@
 /**
- * norvex Integration Tests
+ * iopress Integration Tests
  *
  * Full stack tests using Node.js built-in test runner and native fetch.
  *
@@ -10,18 +10,18 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const norvex = require('../js/index.js');
+const iopress = require('../js/index.js');
 
 const TEST_PORT = 3459;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
-describe('norvex Integration Tests', () => {
+describe('iopress Integration Tests', () => {
   let app;
   let server;
 
   // Setup: Create app and start server before all tests
   before(async () => {
-    app = norvex();
+    app = iopress();
 
     // Health check endpoint
     app.get('/health', (req, res) => {
@@ -331,13 +331,13 @@ describe('norvex Integration Tests', () => {
 
   describe('Server Info', () => {
     it('should expose version', () => {
-      assert.strictEqual(typeof norvex.version, 'string');
-      assert.ok(norvex.version.length > 0);
+      assert.strictEqual(typeof iopress.version, 'string');
+      assert.ok(iopress.version.length > 0);
     });
 
     it('should expose platform', () => {
-      assert.strictEqual(typeof norvex.platform, 'string');
-      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(norvex.platform));
+      assert.strictEqual(typeof iopress.platform, 'string');
+      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(iopress.platform));
     });
   });
 });
