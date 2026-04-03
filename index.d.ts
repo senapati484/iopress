@@ -1,5 +1,5 @@
 /**
- * Express-Pro - High-performance native HTTP server
+ * expressmax - High-performance native HTTP server
  * TypeScript declarations
  */
 
@@ -7,8 +7,8 @@
 
 import { Buffer } from 'node:buffer';
 
-declare namespace ExpressPro {
-  interface ExpressProOptions {
+declare namespace expressmax {
+  interface ExpressMaxOptions {
     /** Initial buffer size for request/response handling (default: 16384) */
     initialBufferSize?: number;
     /** Maximum allowed body size in bytes (default: 1048576 = 1MB) */
@@ -132,7 +132,7 @@ declare namespace ExpressPro {
     backend: string;
   }
 
-  class ExpressProClass {
+  class expressmaxClass {
     /** Module version */
     readonly version: string;
     /** Current platform (linux, macos, windows) */
@@ -140,7 +140,7 @@ declare namespace ExpressPro {
     /** Async I/O backend being used */
     readonly backend: string;
 
-    constructor(options?: ExpressProOptions);
+    constructor(options?: expressmaxOptions);
 
     /**
      * Register middleware for all routes
@@ -222,19 +222,19 @@ declare namespace ExpressPro {
 }
 
 /**
- * Create Express-Pro application instance
+ * Create expressmax application instance
  * @param options Configuration options
- * @returns ExpressPro application instance
+ * @returns expressmax application instance
  */
-declare function expressmax(options?: ExpressPro.ExpressProOptions): ExpressPro.ExpressProClass;
+declare function expressmax(options?: expressmax.expressmaxOptions): expressmax.expressmaxClass;
 
 declare namespace expressmax {
   export const version: string;
   export const platform: string;
   export const backend: string;
-  export const ExpressPro: typeof ExpressPro.ExpressProClass;
-  export const Request: typeof ExpressPro.Request;
-  export const Response: typeof ExpressPro.Response;
+  export const expressmax: typeof expressmax.expressmaxClass;
+  export const Request: typeof expressmax.Request;
+  export const Response: typeof expressmax.Response;
 }
 
 export = expressmax;

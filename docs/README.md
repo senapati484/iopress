@@ -1,10 +1,10 @@
-# Express-Pro Documentation
+# expressmax Documentation
 
-Welcome to the Express-Pro documentation! Choose your path:
+Welcome to the expressmax documentation! Choose your path:
 
 ## Quick Start
 
-- [**Getting Started**](guides/getting-started.md) - Your first Express-Pro server in 5 minutes
+- [**Getting Started**](guides/getting-started.md) - Your first expressmax server in 5 minutes
 - [**Installation**](deployment/PREBUILT_BINARIES.md) - Installation options and prebuilt binaries
 
 ## Core Documentation
@@ -62,16 +62,16 @@ Welcome to the Express-Pro documentation! Choose your path:
 
 ## Quick Links
 
-- [GitHub Repository](https://github.com/senapati484/express-pro)
-- [npm Package](https://www.npmjs.com/package/express-pro)
-- [Issues & Bug Reports](https://github.com/senapati484/express-pro/issues)
-- [Discussions](https://github.com/senapati484/express-pro/discussions)
+- [GitHub Repository](https://github.com/senapati484/expressmax)
+- [npm Package](https://www.npmjs.com/package/expressmax)
+- [Issues & Bug Reports](https://github.com/senapati484/expressmax/issues)
+- [Discussions](https://github.com/senapati484/expressmax/discussions)
 
 ## Community
 
-- 💬 [Discord](https://discord.gg/express-pro)
+- 💬 [Discord](https://discord.gg/expressmax)
 - 🐦 [Twitter](https://twitter.com/express_pro)
-- 📧 [Email Support](mailto:support@express-pro.dev)
+- 📧 [Email Support](mailto:support@expressmax.dev)
 
 ---
 

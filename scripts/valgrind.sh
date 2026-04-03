@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Express-Pro Valgrind Memory Check
+# expressmax Valgrind Memory Check
 #
 # Run with: npm run memcheck
 #
@@ -9,7 +9,7 @@
 
 set -e
 
-echo "=== Express-Pro Valgrind Memory Check ==="
+echo "=== expressmax Valgrind Memory Check ==="
 echo ""
 
 # Check if running on Linux
@@ -40,9 +40,9 @@ echo "This will take a few minutes."
 echo ""
 
 # Create a simple server script for Valgrind
-cat > /tmp/express-pro-valgrind-server.js << 'EOF'
-const expresspro = require('./js/index.js');
-const app = expresspro();
+cat > /tmp/expressmax-valgrind-server.js << 'EOF'
+const expressmax = require('./js/index.js');
+const app = expressmax();
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -68,7 +68,7 @@ valgrind \
     --error-exitcode=1 \
     --suppressions=./scripts/valgrind-suppressions.txt \
     --log-file=./valgrind.log \
-    node --expose-gc /tmp/express-pro-valgrind-server.js &
+    node --expose-gc /tmp/expressmax-valgrind-server.js &
 
 VALGRIND_PID=$!
 
@@ -110,7 +110,7 @@ else
 fi
 
 # Cleanup
-rm -f /tmp/express-pro-valgrind-server.js
+rm -f /tmp/expressmax-valgrind-server.js
 
 echo ""
 echo "Done."

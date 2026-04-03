@@ -1,11 +1,11 @@
 /**
- * Express-Pro HTTP Parser Header
+ * expressmax HTTP Parser Header
  *
  * @file parser.h
  */
 
-#ifndef EXPRESS_PRO_PARSER_H
-#define EXPRESS_PRO_PARSER_H
+#ifndef EXPRESSMAX_PARSER_H
+#define EXPRESSMAX_PARSER_H
 
 #include "server.h"
 

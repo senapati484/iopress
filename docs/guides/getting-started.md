@@ -1,6 +1,6 @@
-# Getting Started with Express-Pro
+# Getting Started with expressmax
 
-Welcome to Express-Pro! This guide will walk you through creating your first high-performance HTTP server using our native C++ HTTP engine.
+Welcome to expressmax! This guide will walk you through creating your first high-performance HTTP server using our native C++ HTTP engine.
 
 ## Table of Contents
 
@@ -27,15 +27,15 @@ Before you begin, ensure you have the following installed:
   - **macOS**: Install Xcode Command Line Tools (`xcode-select --install`)
   - **Windows**: Install Visual Studio Build Tools with "Desktop development with C++" workload
 
-### Install Express-Pro
+### Install expressmax
 
-Create a new directory for your project and install Express-Pro:
+Create a new directory for your project and install expressmax:
 
 ```bash
 mkdir my-first-server
 cd my-first-server
 npm init -y
-npm install express-pro
+npm install expressmax
 ```
 
 **Note**: On Linux, you may need `liburing-dev` for optimal performance:
@@ -51,21 +51,21 @@ Create a file named `server.js` in your project directory:
 
 ```javascript
 // server.js
-const expresspro = require('express-pro');
+const expressmax = require('expressmax');
 
 // Create an application instance
-const app = expresspro();
+const app = expressmax();
 
 // Define a route
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello from Express-Pro!' });
+  res.json({ message: 'Hello from expressmax!' });
 });
 
 // Start the server
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${expresspro.backend}`);
+  console.log(`Native backend: ${expressmax.backend}`);
 });
 ```
 
@@ -84,17 +84,17 @@ Native backend: kqueue  (or io_uring/iocp depending on your platform)
 Test it:
 ```bash
 curl http://localhost:3000/
-# Output: {"message":"Hello from Express-Pro!"}
+# Output: {"message":"Hello from expressmax!"}
 ```
 
 ---
 
 ## Basic Routing
 
-Express-Pro supports Express-style routing with HTTP methods:
+expressmax supports Express-style routing with HTTP methods:
 
 ```javascript
-const app = expresspro();
+const app = expressmax();
 
 // GET request
 app.get('/users', (req, res) => {
@@ -214,7 +214,7 @@ app.post('/users', (req, res) => {
 Middleware functions execute before your route handlers:
 
 ```javascript
-const app = expresspro();
+const app = expressmax();
 
 // Global middleware (runs on every request)
 app.use((req, res, next) => {
@@ -278,7 +278,7 @@ NODE_ENV=production node server.js
 Handle shutdown signals properly:
 
 ```javascript
-const app = expresspro();
+const app = expressmax();
 const server = app.listen(3000, () => {
   console.log('Server started');
 });
@@ -324,9 +324,9 @@ Here's a complete REST API example:
 
 ```javascript
 // api-server.js
-const expresspro = require('express-pro');
+const expressmax = require('expressmax');
 
-const app = expresspro();
+const app = expressmax();
 
 // In-memory "database"
 const users = [
@@ -342,7 +342,7 @@ app.use((req, res, next) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', backend: expresspro.backend });
+  res.json({ status: 'ok', backend: expressmax.backend });
 });
 
 // Get all users
@@ -416,7 +416,7 @@ app.onError((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API Server running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${expresspro.backend}`);
+  console.log(`Native backend: ${expressmax.backend}`);
 });
 ```
 
@@ -472,7 +472,7 @@ npm run build
 npm run configure && npm run build
 ```
 
-### "Cannot find module" for express-pro
+### "Cannot find module" for expressmax
 
 ```bash
 # Ensure you're in the correct directory
@@ -507,4 +507,4 @@ app.listen(3001);  # Use port 3001 instead
 
 **Happy Coding!** 🚀
 
-For more information, visit our [GitHub Repository](https://github.com/senapati484/express-pro).
+For more information, visit our [GitHub Repository](https://github.com/senapati484/expressmax).

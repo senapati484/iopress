@@ -1,16 +1,16 @@
 /**
- * Express-Pro JavaScript API
+ * expressmax JavaScript API
  *
  * High-performance native HTTP server with Express-compatible API.
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
- * @module express-pro
+ * @module expressmax
  * @version 1.0.0
  * @license ISC
  * @author senapati484
  *
  * @example
- * const expressmax = require('express-pro');
+ * const expressmax = require('expressmax');
  * const app = expressmax();
  *
  * app.get('/hello', (req, res) => {
@@ -384,7 +384,7 @@ class Response {
 }
 
 /**
- * Express-Pro Application Class.
+ * expressmax Application Class.
  *
  * Main application class for creating HTTP servers with Express-compatible API.
  * Supports middleware, routing, error handling, and method chaining.
@@ -856,7 +856,7 @@ class ExpressMax {
  * @since 1.0.0
  *
  * @example
- * const expressmax = require('express-pro');
+ * const expressmax = require('expressmax');
  * const app = expressmax();
  *
  * app.get('/', (req, res) => {

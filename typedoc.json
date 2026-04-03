@@ -2,7 +2,7 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["js/index.js"],
   "out": "docs",
-  "name": "Express-Pro",
+  "name": "expressmax",
   "includeVersion": true,
   "excludeExternals": true,
   "excludePrivate": false,
@@ -49,6 +49,6 @@
   "searchInComments": true,
   "searchInDocuments": true,
   "highlightLanguages": ["javascript", "typescript", "json"],
-  "sourceLinkTemplate": "https://github.com/senapati484/express-pro/blob/main/{path}#L{line}",
+  "sourceLinkTemplate": "https://github.com/senapati484/expressmax/blob/main/{path}#L{line}",
   "gitRevision": "main"
 }

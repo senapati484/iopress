@@ -2,7 +2,7 @@
 
 set -e
 
-echo "=== Express-Pro Benchmark ==="
+echo "=== expressmax Benchmark ==="
 echo "Platform: $(uname -s)"
 echo "Node: $(node --version)"
 echo ""

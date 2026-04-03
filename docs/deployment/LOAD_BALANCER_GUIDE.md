@@ -27,13 +27,13 @@ Traditional Setup: 3-4 Node processes load balanced
 - Additional hop latency (~0.5-2ms)
 - Operational complexity
 
-## Express-Pro Solution
+## expressmax Solution
 
-With Express-Pro's native performance, a **single process** can often replace multiple Node.js processes:
+With expressmax's native performance, a **single process** can often replace multiple Node.js processes:
 
 ```
 ┌─────────────┐         ┌─────────────┐
-│   Client    │────────▶│ Express-Pro │
+│   Client    │────────▶│ expressmax │
 │             │         │  (1 process)  │
 └─────────────┘         └─────────────┘
         │                        │
@@ -42,7 +42,7 @@ With Express-Pro's native performance, a **single process** can often replace mu
 
 ## Performance Comparison by Platform
 
-| Platform | Express-Pro | Express.js | Ratio |
+| Platform | expressmax | Express.js | Ratio |
 |----------|-------------|------------|-------|
 | **Linux (io_uring)** | **300k-500k req/s** | ~15k req/s | **20-33x** |
 | macOS (kqueue) | ~80k req/s | ~15k req/s | 5x |
@@ -52,11 +52,11 @@ With Express-Pro's native performance, a **single process** can often replace mu
 
 ### Single Server Scenarios
 
-If your traffic is under **300k req/s**, a single Express-Pro instance on Linux can handle it:
+If your traffic is under **300k req/s**, a single expressmax instance on Linux can handle it:
 
 ```javascript
 // Single process handling 300k req/s
-const app = expresspro();
+const app = expressmax();
 app.listen(80);  // That's it!
 ```
 
@@ -107,7 +107,7 @@ Use when:
 
 ### 2. Static File Serving
 
-Express-Pro is optimized for API requests. For static files, use nginx:
+expressmax is optimized for API requests. For static files, use nginx:
 
 ```nginx
 server {
@@ -119,7 +119,7 @@ server {
     }
     
     location /api/ {
-        # Proxy to Express-Pro
+        # Proxy to expressmax
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -129,7 +129,7 @@ server {
 
 ### 3. SSL/TLS Termination
 
-Until Express-Pro v2 adds native HTTPS:
+Until expressmax v2 adds native HTTPS:
 
 ```nginx
 server {
@@ -155,12 +155,12 @@ wrk -t4 -c400 -d30s http://your-api/endpoint
 # Note current: requests/sec, latency p99
 ```
 
-### Step 2: Deploy Express-Pro
+### Step 2: Deploy expressmax
 
 ```javascript
 // server.js
-const expresspro = require('express-pro');
-const app = expresspro();
+const expressmax = require('expressmax');
+const app = expressmax();
 
 // Your routes here
 app.get('/api/users', (req, res) => {
@@ -179,7 +179,7 @@ app.listen(3000, () => {
 ### Step 3: Performance Test
 
 ```bash
-# Test Express-Pro single instance
+# Test expressmax single instance
 wrk -t4 -c400 -d30s http://localhost:3000/api/users
 
 # Expected: 10-20x improvement over Express
@@ -188,8 +188,8 @@ wrk -t4 -c400 -d30s http://localhost:3000/api/users
 ### Step 4: Gradual Migration
 
 ```
-Phase 1: Deploy Express-Pro alongside existing setup
-Phase 2: Route 10% traffic to Express-Pro
+Phase 1: Deploy expressmax alongside existing setup
+Phase 2: Route 10% traffic to expressmax
 Phase 3: Monitor for 24h
 Phase 4: Route 100% traffic
 Phase 5: Remove load balancer (if single server)
@@ -206,7 +206,7 @@ Phase 5: Remove load balancer (if single server)
 | Operational complexity | High |
 | **Total** | **$200/month** |
 
-### After (Express-Pro)
+### After (expressmax)
 
 | Component | Cost/Month |
 |-----------|-----------|
@@ -219,7 +219,7 @@ Phase 5: Remove load balancer (if single server)
 
 ## Kubernetes Deployment
 
-### Without Express-Pro (Traditional)
+### Without expressmax (Traditional)
 
 ```yaml
 apiVersion: apps/v1
@@ -248,7 +248,7 @@ spec:
   - port: 80
 ```
 
-### With Express-Pro
+### With expressmax
 
 ```yaml
 apiVersion: apps/v1
@@ -260,8 +260,8 @@ spec:
   template:
     spec:
       containers:
-      - name: express-pro
-        image: express-pro:latest
+      - name: expressmax
+        image: expressmax:latest
         resources:
           requests:
             memory: "256Mi"
@@ -304,9 +304,9 @@ setInterval(() => {
 
 | Traffic | Recommendation |
 |---------|---------------|
-| < 50k req/s | Single Express-Pro process, no load balancer |
-| 50k-300k req/s | Single Express-Pro process, monitor closely |
-| 300k+ req/s | Multiple Express-Pro instances with load balancer |
+| < 50k req/s | Single expressmax process, no load balancer |
+| 50k-300k req/s | Single expressmax process, monitor closely |
+| 300k+ req/s | Multiple expressmax instances with load balancer |
 | Global/multi-region | Multiple servers with geographic LB |
 
-**Bottom line:** Express-Pro eliminates load balancers for 95% of use cases!
+**Bottom line:** expressmax eliminates load balancers for 95% of use cases!

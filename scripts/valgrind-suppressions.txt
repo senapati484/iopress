@@ -1,4 +1,4 @@
-# Valgrind suppressions for Express-Pro
+# Valgrind suppressions for expressmax
 #
 # These suppress known "false positive" memory issues from V8 and Node.js
 

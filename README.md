@@ -425,7 +425,7 @@ app.post('/upload', (req, res) => {
 
 ### Backend Auto-Detection
 
-Express-Pro automatically selects the best available backend:
+ExpressMax automatically selects the best available backend:
 
 1. **Linux with kernel 5.1+**: Uses io_uring for maximum performance
 2. **macOS**: Uses kqueue for efficient event notification
@@ -441,7 +441,7 @@ console.log(expressmax.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 
 ## Migrating from Express
 
-Express-Pro is designed to be API-compatible with Express.js for common use cases.
+ExpressMax is designed to be API-compatible with Express.js for common use cases.
 
 ### What's Compatible
 
@@ -453,7 +453,7 @@ Express-Pro is designed to be API-compatible with Express.js for common use case
 
 ### What's Different
 
-| Feature | Express.js | Express-Pro |
+| Feature | Express.js | ExpressMax |
 |---------|-----------|-------------|
 | Create app | `const app = express()` | `const app = expressmax()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
@@ -480,7 +480,7 @@ app.get('/api/users/:id', (req, res) => {
 app.listen(3000);
 ```
 
-**Express-Pro:**
+**ExpressMax:**
 ```javascript
 const expressmax = require('expressmax');
 const app = expressmax();
@@ -509,8 +509,8 @@ app.listen(3000);
 
 ```bash
 # Clone the repository
-git clone https://github.com/senapati484/express-pro.git
-cd express-pro
+git clone https://github.com/senapati484/expressmax.git
+cd expressmax
 
 # Install dependencies
 npm install
@@ -568,9 +568,9 @@ Results from AMD Ryzen 9 5900X, Node.js 20:
 
 | Server | Requests/sec | Latency (p99) |
 |--------|-------------|---------------|
-| Express-Pro (io_uring) | 520,000 | 0.8ms |
-| Express-Pro (kqueue) | 155,000 | 2.1ms |
-| Express-Pro (IOCP) | 105,000 | 3.5ms |
+| ExpressMax (io_uring) | 520,000 | 0.8ms |
+| ExpressMax (kqueue) | 155,000 | 2.1ms |
+| ExpressMax (IOCP) | 105,000 | 3.5ms |
 | Node.js http | 45,000 | 8.2ms |
 | Express.js | 18,000 | 22ms |
 | Fastify | 65,000 | 5.1ms |
@@ -611,4 +611,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-**Made with performance in mind.** If you find Express-Pro useful, please consider starring the repository on GitHub!
+**Made with performance in mind.** If you find ExpressMax useful, please consider starring the repository on GitHub!

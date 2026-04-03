@@ -1,5 +1,5 @@
 /**
- * Express-Pro HTTP/1.1 Request Parser
+ * expressmax HTTP/1.1 Request Parser
  *
  * Zero-copy, single-pass HTTP request parser optimized for performance.
  * Uses SIMD-optimized memchr for scanning and never allocates memory.

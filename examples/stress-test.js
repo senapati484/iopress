@@ -358,7 +358,7 @@ async function runPostTest() {
 // Run all tests
 async function runAllTests() {
   console.log('='.repeat(60));
-  console.log('Express-Pro Stress Test');
+  console.log('expressmax Stress Test');
   console.log('Platform:', expressmax.platform);
   console.log('Backend:', expressmax.backend);
   console.log('Configuration:');

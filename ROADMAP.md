@@ -1,6 +1,6 @@
-# express-pro Roadmap
+# expressmax Roadmap
 
-This document outlines the planned features and direction for express-pro. Roadmap items are organized by milestone and version.
+This document outlines the planned features and direction for expressmax. Roadmap items are organized by milestone and version.
 
 ## Current Status: v1.0
 
@@ -51,7 +51,7 @@ This document outlines the planned features and direction for express-pro. Roadm
 
 **API Considerations**:
 ```javascript
-const app = expresspro({
+const app = expressmax({
   http2: true,
   allowHTTP1: true  // Upgrade from HTTP/1.1
 });
@@ -85,7 +85,7 @@ res.push('/static/style.css', {
 
 **API**:
 ```javascript
-const app = expresspro();
+const app = expressmax();
 
 app.listen(443, {
   tls: {
@@ -127,7 +127,7 @@ app.listen(443, {
 **Priority**: Medium  
 **Effort**: Medium
 
-- [ ] `expresspro.static()` middleware
+- [ ] `expressmax.static()` middleware
 - [ ] Platform-optimized sendfile:
   - Linux: `io_uring` with `IORING_OP_SEND`
   - macOS: `sendfile()` syscall
@@ -138,7 +138,7 @@ app.listen(443, {
 
 **API**:
 ```javascript
-app.use(expresspro.static('public', {
+app.use(expressmax.static('public', {
   maxAge: '1d',
   etag: true,
   lastModified: true,
@@ -165,7 +165,7 @@ app.use(expresspro.static('public', {
 **API**:
 ```javascript
 // Option 1: Explicit worker pool
-const worker = require('express-pro/worker');
+const worker = require('expressmax/worker');
 
 app.get('/compute', worker((req, res) => {
   // Runs in worker thread
@@ -269,9 +269,9 @@ Roadmap dates are estimates. Priorities may shift based on:
 
 ## References
 
-- [GitHub Projects](https://github.com/senapati484/express-pro/projects) — Kanban boards for v2 development
-- [Milestones](https://github.com/senapati484/express-pro/milestones) — Release planning
-- [Discussions](https://github.com/senapati484/express-pro/discussions) — RFCs and design discussions
+- [GitHub Projects](https://github.com/senapati484/expressmax/projects) — Kanban boards for v2 development
+- [Milestones](https://github.com/senapati484/expressmax/milestones) — Release planning
+- [Discussions](https://github.com/senapati484/expressmax/discussions) — RFCs and design discussions
 
 ---
 

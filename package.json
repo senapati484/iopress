@@ -44,10 +44,10 @@
   ],
   "author": "senapati484 <senapati484@example.com>",
   "license": "MIT",
-  "homepage": "https://github.com/senapati484/express-pro#readme",
+  "homepage": "https://github.com/senapati484/expressmax#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/senapati484/express-pro.git"
+    "url": "https://github.com/senapati484/expressmax.git"
   },
   "dependencies": {},
   "devDependencies": {

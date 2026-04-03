@@ -1,5 +1,5 @@
 /**
- * Express-Pro HTTP Router Implementation
+ * expressmax HTTP Router Implementation
  *
  * O(k) trie-based router with :param support.
  *

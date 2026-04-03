@@ -1,5 +1,5 @@
 /**
- * Express-Pro N-API Binding
+ * expressmax N-API Binding
  *
  * Bridge between JavaScript and the native HTTP server.
  * Handles thread-safe communication using napi_threadsafe_function.

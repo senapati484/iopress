@@ -1,15 +1,15 @@
-# Migration Guide: Express.js → Express-Pro
+# Migration Guide: Express.js → expressmax
 
-This guide helps you migrate existing Express.js applications to Express-Pro. Most applications require minimal changes.
+This guide helps you migrate existing Express.js applications to expressmax. Most applications require minimal changes.
 
 **Estimated migration time:** 30 minutes to 2 hours depending on application complexity.
 
 ## Quick Reference
 
-| Feature | Express.js | Express-Pro | Action |
+| Feature | Express.js | expressmax | Action |
 |---------|-----------|-------------|--------|
-| Import | `require('express')` | `require('express-pro')` | ✅ Replace |
-| App creation | `express()` | `expresspro()` | ⚠️  Update |
+| Import | `require('express')` | `require('expressmax')` | ✅ Replace |
+| App creation | `express()` | `expressmax()` | ⚠️  Update |
 | Route handlers | `app.get()` | `app.get()` | ✅ Same |
 | Middleware | `app.use()` | `app.use()` | ✅ Same |
 | Route params | `req.params.id` | `req.params.id` | ✅ Same |
@@ -30,8 +30,8 @@ This guide helps you migrate existing Express.js applications to Express-Pro. Mo
 # Remove Express (optional, or keep for gradual migration)
 npm uninstall express
 
-# Install Express-Pro
-npm install express-pro
+# Install expressmax
+npm install expressmax
 
 # Build native addon
 npm run build
@@ -45,15 +45,15 @@ const express = require('express');
 const app = express();
 ```
 
-**After (Express-Pro):**
+**After (expressmax):**
 ```javascript
-const expresspro = require('express-pro');
-const app = expresspro();
+const expressmax = require('expressmax');
+const app = expressmax();
 ```
 
 ### Step 3: Remove Body Parsing Middleware
 
-Express-Pro has built-in body parsing. Remove these lines:
+expressmax has built-in body parsing. Remove these lines:
 
 **Before:**
 ```javascript
@@ -63,12 +63,12 @@ app.use(express.urlencoded({ extended: true }));
 
 **After:**
 ```javascript
-// No body parsing middleware needed - built into Express-Pro
+// No body parsing middleware needed - built into expressmax
 ```
 
 ### Step 4: Handle Static Files
 
-Express-Pro does not include `express.static`. Options:
+expressmax does not include `express.static`. Options:
 
 **Option A: Use a CDN (Recommended for Production)**
 ```javascript
@@ -120,7 +120,7 @@ location / {
 
 ### Step 5: Handle View Engines
 
-Express-Pro does not support template engines (`res.render`). Convert to API responses:
+expressmax does not support template engines (`res.render`). Convert to API responses:
 
 **Before:**
 ```javascript
@@ -145,7 +145,7 @@ app.get('/user/:id', (req, res) => {
 
 ### Step 6: Handle Cookies
 
-Express-Pro does not include cookie parsing:
+expressmax does not include cookie parsing:
 
 ```javascript
 // Manual cookie parsing
@@ -232,14 +232,14 @@ app.listen(3000, () => {
 });
 ```
 
-### After: Express-Pro App
+### After: expressmax App
 
 ```javascript
-const expresspro = require('express-pro');
+const expressmax = require('expressmax');
 const fs = require('fs');
 const path = require('path');
 
-const app = expresspro();
+const app = expressmax();
 
 // Cookie parsing middleware (manual)
 function parseCookies(header) {
@@ -297,14 +297,14 @@ app.onError((err, req, res) => {
 
 // Start server
 app.listen(3000, () => {
-  console.log('Express-Pro server on port 3000');
+  console.log('expressmax server on port 3000');
   console.log('Backend:', app.backend || 'unknown');
 });
 ```
 
 ## Platform-Specific Performance
 
-Express-Pro automatically selects the best async I/O backend for your platform:
+expressmax automatically selects the best async I/O backend for your platform:
 
 | Platform | Backend | Expected Performance |
 |----------|---------|---------------------|
@@ -318,10 +318,10 @@ Express-Pro automatically selects the best async I/O backend for your platform:
 Your application works identically across all platforms. The backend selection is transparent:
 
 ```javascript
-const app = expresspro();
+const app = expressmax();
 
 // Check which backend is being used
-console.log('Backend:', expresspro.backend);
+console.log('Backend:', expressmax.backend);
 // Linux: 'io_uring'
 // macOS: 'kqueue'
 // Windows: 'iocp'
@@ -346,7 +346,7 @@ npm run build
 **All Platforms:**
 ```javascript
 // Tune for your workload
-const app = expresspro({
+const app = expressmax({
   initialBufferSize: 65536,  // For large headers
   maxBodySize: 10 * 1024 * 1024  // 10MB for file uploads
 });
@@ -356,7 +356,7 @@ const app = expresspro({
 
 ### Issue: `res.render is not a function`
 
-**Cause:** Express-Pro does not support template engines.
+**Cause:** expressmax does not support template engines.
 
 **Solution:** Use static HTML files or a separate frontend framework.
 
@@ -413,7 +413,7 @@ For large applications, consider gradual migration:
 3. **Route by path prefix:**
    ```nginx
    location /api/v2/ {
-       proxy_pass http://express-pro:3000;
+       proxy_pass http://expressmax:3000;
    }
    location / {
        proxy_pass http://express-legacy:3001;
@@ -425,8 +425,8 @@ For large applications, consider gradual migration:
 
 - **Documentation:** [README.md](./README.md)
 - **Examples:** [examples/](./examples/)
-- **Issues:** https://github.com/senapati484/express-pro/issues
+- **Issues:** https://github.com/senapati484/expressmax/issues
 
 ---
 
-**Migration complete!** Your application should now be running on Express-Pro with significantly improved performance on Linux.
+**Migration complete!** Your application should now be running on expressmax with significantly improved performance on Linux.

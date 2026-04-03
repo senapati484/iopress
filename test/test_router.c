@@ -1,5 +1,5 @@
 /**
- * Express-Pro HTTP Router Test Suite
+ * expressmax HTTP Router Test Suite
  *
  * Standalone test binary for the trie-based router.
  *
@@ -431,7 +431,7 @@ void test_static_vs_param_precedence(void) {
  */
 
 int main(void) {
-  printf("\033[1mExpress-Pro HTTP Router Test Suite\033[0m\n");
+  printf("\033[1mexpressmax HTTP Router Test Suite\033[0m\n");
   printf("====================================\n\n");
 
   test_basic_routes();

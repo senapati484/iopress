@@ -1,6 +1,6 @@
 # Deprecation Policy
 
-This document defines how express-pro manages API deprecations and breaking changes.
+This document defines how expressmax manages API deprecations and breaking changes.
 
 ## Policy Overview
 
@@ -46,7 +46,7 @@ v2.0: Feature removed (breaking change)
 Deprecated features emit warnings via `process.emitWarning()`:
 
 ```
-(node:12345) DeprecationWarning: express-pro: 'legacyMode' option is deprecated since v1.3.0, will be removed in v2.0.0. Use 'mode: "modern"' instead.
+(node:12345) DeprecationWarning: expressmax: 'legacyMode' option is deprecated since v1.3.0, will be removed in v2.0.0. Use 'mode: "modern"' instead.
 ```
 
 ### Enabling Deprecation Warnings

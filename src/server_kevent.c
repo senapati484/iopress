@@ -1,5 +1,5 @@
 /**
- * Express-Pro kqueue Backend (macOS/BSD)
+ * expressmax kqueue Backend (macOS/BSD)
  *
  * High-performance event-driven HTTP server using kqueue.
  *

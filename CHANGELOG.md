@@ -95,5 +95,5 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ---
 
-[unreleased]: https://github.com/senapati484/express-pro/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/senapati484/express-pro/releases/tag/v1.0.0
+[unreleased]: https://github.com/senapati484/expressmax/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/senapati484/expressmax/releases/tag/v1.0.0

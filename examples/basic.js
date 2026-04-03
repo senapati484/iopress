@@ -59,9 +59,9 @@ app.get('/health', (req, res) => {
 // GET /info - Server information
 app.get('/info', (req, res) => {
   res.json({
-    version: expresspro.version,
-    platform: expresspro.platform,
-    backend: expresspro.backend,
+    version: expressmax.version,
+    platform: expressmax.platform,
+    backend: expressmax.backend,
     nodeVersion: process.version
   });
 });
