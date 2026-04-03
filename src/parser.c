@@ -373,27 +373,67 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   }
 
   if (chunked) {
-    /* Chunked encoding - body parsing is more complex
-     * For now, mark body present but need chunked parser */
+    /* B9: Chunked encoding - check if complete chunked body received */
     result->body_present = true;
-    result->body_length = 0; /* Unknown until parsed */
+    result->body_length = 0;
     result->bytes_consumed = headers_end - (const char*)buf;
 
-    /* Check if we have any body data yet */
     size_t body_received = len - result->body_start;
-
-    /* Look for end of chunked body (0\r\n) */
-    /* Simplified: just check if we have some data */
-    if (body_received >= 5) {
-      /* Check for termination */
-      const char* term = xp_memmem(headers_end, body_received, "0\r\n\r\n", 5);
-      if (term != NULL) {
-        result->status = PARSE_STATUS_DONE;
-        return result->status;
-      }
+    if (body_received < 5) {
+      result->status = PARSE_STATUS_NEED_MORE;
+      return result->status;
     }
 
-    result->status = PARSE_STATUS_NEED_MORE;
+    const char* body_start = (const char*)buf + result->body_start;
+
+    /* Check for final chunk terminator: "0\r\n\r\n" */
+    const char* term = xp_memmem(body_start, body_received, "0\r\n\r\n", 5);
+    if (term == NULL) {
+      result->status = PARSE_STATUS_NEED_MORE;
+      return result->status;
+    }
+
+    /* Verify there's at least one chunk before the final 0 */
+    const char* first_crlf = memchr(body_start, '\r', body_received);
+    if (first_crlf == NULL || first_crlf >= term) {
+      result->status = PARSE_STATUS_NEED_MORE;
+      return result->status;
+    }
+
+    /* Calculate total assembled size by parsing all chunks */
+    size_t assembled_size = 0;
+    const uint8_t* p = (const uint8_t*)body_start;
+    const uint8_t* body_end = (const uint8_t*)body_start + body_received;
+
+    while (p < body_end) {
+      const uint8_t* nl = memchr(p, '\n', body_end - p);
+      if (!nl) break;
+
+      size_t chunk_size = 0;
+      const uint8_t* sp = p;
+      while (sp < nl) {
+        char c = (char)*sp;
+        if (c >= '0' && c <= '9')
+          chunk_size = chunk_size * 16 + (c - '0');
+        else if (c >= 'a' && c <= 'f')
+          chunk_size = chunk_size * 16 + (c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F')
+          chunk_size = chunk_size * 16 + (c - 'A' + 10);
+        else if (c == '\r' || c == ';')
+          break;
+        else
+          break;
+        sp++;
+      }
+
+      p = nl + 1;
+      if (chunk_size == 0) break;
+      p += chunk_size + 2;
+      assembled_size += chunk_size;
+    }
+
+    result->body_length = assembled_size;
+    result->status = PARSE_STATUS_DONE;
     return result->status;
   }
 

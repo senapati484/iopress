@@ -112,8 +112,8 @@ app.post('/upload', (req, res) => {
   const contentLength = parseInt(req.get('Content-Length') || '0', 10);
   const contentType = req.get('Content-Type') || 'application/octet-stream';
 
-  // Create write stream
-  const writeStream = fs.createWriteStream(filepath);
+  // Create write stream (for actual file writing in production)
+  // const writeStream = fs.createWriteStream(filepath);
 
   // Track progress
   let bytesReceived = 0;
@@ -138,7 +138,7 @@ app.post('/upload', (req, res) => {
   // For this example, we'll simulate the streaming behavior
 
   // Since we're demonstrating the API, let's handle the raw body
-  const chunks = [];
+  // const chunks = [];
 
   // If we have raw body as buffer, write it
   if (req.rawBody) {
@@ -292,7 +292,7 @@ app.get('/stream', (req, res) => {
 });
 
 // Error handling
-app.onError((err, req, res, next) => {
+app.onError((err, req, res, _next) => {
   console.error('Upload error:', err);
   res.status(500).json({
     error: 'Upload failed',
@@ -301,7 +301,7 @@ app.onError((err, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 app.listen(PORT, () => {
   console.log(`Upload Server running on http://localhost:${PORT}`);

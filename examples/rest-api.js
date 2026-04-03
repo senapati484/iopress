@@ -188,7 +188,7 @@ app.delete('/users/:id', (req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 app.listen(PORT, () => {
   console.log(`REST API Server running on http://localhost:${PORT}`);

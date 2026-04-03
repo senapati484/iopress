@@ -199,7 +199,7 @@ app.get('/error', (req, res, next) => {
 });
 
 // Error handling middleware
-app.onError((err, req, res, next) => {
+app.onError((err, req, res, _next) => {
   console.error(`[${req.requestId || 'unknown'}] Error:`, err.message);
 
   // Don't leak stack traces in production
@@ -223,7 +223,7 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 app.listen(PORT, () => {
   console.log(`Middleware Example Server running on http://localhost:${PORT}`);

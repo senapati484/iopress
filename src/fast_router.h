@@ -11,9 +11,9 @@
 #ifndef FAST_ROUTER_H
 #define FAST_ROUTER_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define MAX_FAST_ROUTES 64
 #define MAX_PATH_LEN 128
@@ -21,9 +21,9 @@
 
 /* Route types */
 typedef enum {
-  ROUTE_TYPE_STATIC_JSON,   /* Static JSON response */
-  ROUTE_TYPE_STATIC_TEXT,   /* Static text response */
-  ROUTE_TYPE_DYNAMIC        /* Requires JavaScript handler */
+  ROUTE_TYPE_STATIC_JSON, /* Static JSON response */
+  ROUTE_TYPE_STATIC_TEXT, /* Static text response */
+  ROUTE_TYPE_DYNAMIC      /* Requires JavaScript handler */
 } route_type_t;
 
 /* Fast route entry */
@@ -52,8 +52,8 @@ void fast_router_init(void);
 /* Register a fast route */
 int fast_router_register(const char* method, const char* path,
                          route_type_t type, uint16_t status,
-                         const char* content_type,
-                         const uint8_t* response, size_t response_len);
+                         const char* content_type, const uint8_t* response,
+                         size_t response_len);
 
 /* Try to handle request in fast path */
 /* Returns: 0 = handled, 1 = needs JavaScript, -1 = error */

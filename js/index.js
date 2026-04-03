@@ -323,11 +323,12 @@ class Response {
       this.set('Content-Type', 'text/plain; charset=utf-8');
     }
 
-    // Call native SendResponse
+    // Call native SendResponse with headers
     this._binding.SendResponse(
       this._fd,
       this.statusCode,
-      bodyStr
+      bodyStr,
+      this.headers
     );
 
     this._sent = true;
@@ -449,6 +450,7 @@ class ExpressPro {
    * app.use('/api', authenticateUser);
    */
   use(path, ...handlers) {
+    const hadExplicitPath = typeof path !== 'function';
     if (typeof path === 'function') {
       handlers.unshift(path);
       path = '/';
@@ -457,7 +459,10 @@ class ExpressPro {
       if (typeof handler !== 'function') {
         throw new TypeError('Middleware handler must be a function');
       }
-      this.middleware.push({ path, handler });
+      // isTerminal: true if this is a catch-all handler (no explicit path and doesn't call next)
+      // These should only run when no route matches
+      const isTerminal = !hadExplicitPath && path === '/';
+      this.middleware.push({ path, handler, isTerminal });
     }
     return this;
   }
@@ -626,6 +631,11 @@ class ExpressPro {
     for (const route of this.routes) {
       if (route.method !== method) continue;
 
+      // Handle exact path match (including root '/')
+      if (route.path === path) {
+        return { route, params: {} };
+      }
+
       const params = {};
       const routeParts = route.path.split('/').filter(Boolean);
       const pathParts = path.split('/').filter(Boolean);
@@ -775,9 +785,15 @@ class ExpressPro {
       if (match) {
         req.params = match.params;
 
-        // Build handler chain: global middleware + route handlers
+        // Build handler chain:
+        // 1. Non-terminal middleware (calls next())
+        // 2. Route handlers
+        // Exclude terminal middleware (catch-all handlers) when a route matches
         const chain = [
-          ...self.middleware.filter(m => req.path.startsWith(m.path)).map(m => m.handler),
+          ...self.middleware.filter(m => {
+            // Include if: path matches AND (not terminal OR explicitly registered with a path)
+            return req.path.startsWith(m.path) && !m.isTerminal;
+          }).map(m => m.handler),
           ...match.route.handlers
         ];
 
@@ -785,7 +801,7 @@ class ExpressPro {
         self._executeChain(req, res, chain);
       } else {
         // No route matched - 404
-        res.status(404).send('Not Found');
+        res.status(404).json({ error: 'Not Found', path: req.path, method: req.method });
       }
     });
 

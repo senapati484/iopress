@@ -25,6 +25,24 @@
 #include "parser.h"
 #include "server.h"
 
+/* xp_memmem is a GNU extension, not in POSIX.1-2001 */
+/* Provide our own implementation */
+static void* xp_memmem(const void* haystack, size_t haystack_len,
+                       const void* needle, size_t needle_len) {
+  if (needle_len == 0) return (void*)haystack;
+  if (haystack_len < needle_len) return NULL;
+
+  const char* h = haystack;
+  const char* n = needle;
+
+  for (size_t i = 0; i <= haystack_len - needle_len; i++) {
+    if (memcmp(h + i, n, needle_len) == 0) {
+      return (void*)(h + i);
+    }
+  }
+  return NULL;
+}
+
 /* ============================================================================
  * Platform Context
  * ============================================================================
@@ -51,6 +69,101 @@ typedef struct kevent_context {
 struct server_handle_s {
   kevent_context_t ctx;
 };
+
+/* ============================================================================
+ * HTTP Chunked Body Assembly
+ * ============================================================================
+ */
+
+static uint8_t* assemble_chunked_body(const uint8_t* data, size_t len,
+                                      size_t* out_len) {
+  /* Calculate total size first */
+  const uint8_t* p = data;
+  const uint8_t* end = data + len;
+  size_t total_size = 0;
+
+  while (p < end) {
+    /* Find end of size line */
+    const uint8_t* nl = memchr(p, '\n', end - p);
+    if (!nl) break;
+
+    /* Parse chunk size (hex) */
+    size_t chunk_size = 0;
+    const uint8_t* sp = p;
+    while (sp < nl) {
+      char c = *sp;
+      if (c >= '0' && c <= '9')
+        chunk_size = chunk_size * 16 + (c - '0');
+      else if (c >= 'a' && c <= 'f')
+        chunk_size = chunk_size * 16 + (c - 'a' + 10);
+      else if (c >= 'A' && c <= 'F')
+        chunk_size = chunk_size * 16 + (c - 'A' + 10);
+      else if (c == '\r' || c == ';')
+        break;
+      else
+        break;
+      sp++;
+    }
+
+    /* Move past size line */
+    p = nl + 1;
+
+    /* Last chunk */
+    if (chunk_size == 0) break;
+
+    /* Skip chunk data and trailing \r\n */
+    p += chunk_size + 2;
+    total_size += chunk_size;
+  }
+
+  if (total_size == 0) {
+    *out_len = 0;
+    return NULL;
+  }
+
+  /* Allocate buffer and copy data */
+  uint8_t* result = malloc(total_size);
+  if (!result) {
+    *out_len = 0;
+    return NULL;
+  }
+
+  /* Second pass: copy data */
+  p = data;
+  uint8_t* out = result;
+
+  while (p < end) {
+    const uint8_t* nl = memchr(p, '\n', end - p);
+    if (!nl) break;
+
+    size_t chunk_size = 0;
+    const uint8_t* sp = p;
+    while (sp < nl) {
+      char c = *sp;
+      if (c >= '0' && c <= '9')
+        chunk_size = chunk_size * 16 + (c - '0');
+      else if (c >= 'a' && c <= 'f')
+        chunk_size = chunk_size * 16 + (c - 'a' + 10);
+      else if (c >= 'A' && c <= 'F')
+        chunk_size = chunk_size * 16 + (c - 'A' + 10);
+      else if (c == '\r' || c == ';')
+        break;
+      else
+        break;
+      sp++;
+    }
+
+    p = nl + 1;
+    if (chunk_size == 0) break;
+
+    memcpy(out, p, chunk_size);
+    out += chunk_size;
+    p += chunk_size + 2;
+  }
+
+  *out_len = total_size;
+  return result;
+}
 
 /* ============================================================================
  * Socket Utilities
@@ -83,6 +196,19 @@ static int set_nodelay(int fd) {
  * ============================================================================
  */
 
+/* Pre-allocated buffer pool for zero-allocation hot path */
+#define BUFFER_POOL_SLOTS 1024
+static uint8_t* g_buffer_pool[BUFFER_POOL_SLOTS];
+static int g_buffer_pool_init = 0;
+
+static void init_buffer_pool(void) {
+  if (g_buffer_pool_init) return;
+  for (int i = 0; i < BUFFER_POOL_SLOTS; i++) {
+    g_buffer_pool[i] = malloc(DEFAULT_INITIAL_BUFFER_SIZE);
+  }
+  g_buffer_pool_init = 1;
+}
+
 static connection_t* get_connection(connection_t* pool, size_t pool_size,
                                     int fd) {
   if (fd < 0 || (size_t)fd >= pool_size) return NULL;
@@ -92,7 +218,14 @@ static connection_t* get_connection(connection_t* pool, size_t pool_size,
     memset(conn, 0, sizeof(*conn));
     conn->fd = fd;
     conn->buffer_cap = DEFAULT_INITIAL_BUFFER_SIZE;
-    conn->buffer = malloc(conn->buffer_cap);
+    /* Use pool buffer for common fd range, malloc for overflow */
+    if (fd < BUFFER_POOL_SLOTS && g_buffer_pool[fd]) {
+      conn->buffer = g_buffer_pool[fd];
+      conn->uses_pool_buffer = 1;
+    } else {
+      conn->buffer = malloc(conn->buffer_cap);
+      conn->uses_pool_buffer = 0;
+    }
     if (conn->buffer == NULL) return NULL;
   }
   return conn;
@@ -126,12 +259,13 @@ static void close_connection(kevent_context_t* ctx, int fd) {
     conn->fd = -1;
     conn->closed = true;
 
-    /* Free buffer */
-    if (conn->buffer) {
+    /* Free buffer (only if not from pool) */
+    if (conn->buffer && !conn->uses_pool_buffer) {
       free(conn->buffer);
-      conn->buffer = NULL;
-      conn->buffer_cap = 0;
     }
+    conn->buffer = NULL;
+    conn->buffer_cap = 0;
+    conn->uses_pool_buffer = 0;
   }
 }
 
@@ -139,6 +273,87 @@ static void close_connection(kevent_context_t* ctx, int fd) {
  * HTTP Response Formatter
  * ============================================================================
  */
+
+static char* fast_itoa(uint16_t val, char* buf) {
+  char tmp[8];
+  int i = 0;
+  if (val == 0) {
+    buf[0] = '0';
+    buf[1] = '\0';
+    return buf;
+  }
+  while (val > 0) {
+    tmp[i++] = '0' + (val % 10);
+    val /= 10;
+  }
+  for (int j = 0; j < i; j++) {
+    buf[j] = tmp[i - 1 - j];
+  }
+  buf[i] = '\0';
+  return buf;
+}
+
+static int format_http_response_fast(int status_code, const uint8_t* body,
+                                     size_t body_len, uint8_t* out,
+                                     size_t out_cap, size_t* out_len) {
+  (void)out_cap; /* Unused - static buffer */
+
+  /* Copy common status line */
+  const char* status_text = "OK";
+  if (status_code == 201)
+    status_text = "Created";
+  else if (status_code == 400)
+    status_text = "Bad Request";
+  else if (status_code == 404)
+    status_text = "Not Found";
+  else if (status_code == 413)
+    status_text = "Payload Too Large";
+  else if (status_code == 500)
+    status_text = "Internal Server Error";
+  else if (status_code != 200)
+    status_text = "Unknown";
+
+  /* Fast status line */
+  out[0] = 'H';
+  out[1] = 'T';
+  out[2] = 'T';
+  out[3] = 'P';
+  out[4] = '/';
+  out[5] = '1';
+  out[6] = '.';
+  out[7] = '1';
+  out[8] = ' ';
+  char* p = out + 9;
+  fast_itoa(status_code, p);
+  while (*p) p++;
+  *p++ = ' ';
+  const char* sp = status_text;
+  while (*sp) *p++ = *sp++;
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Content-Length */
+  const char* cl = "Content-Length: ";
+  const char* c = cl;
+  while (*c) *p++ = *c++;
+  fast_itoa((uint16_t)body_len, p);
+  while (*p) p++;
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* End headers */
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Body */
+  if (body_len > 0 && body != NULL) {
+    memcpy((char*)p, body, body_len);
+    p += body_len;
+  }
+
+  *out_len = p - (char*)out;
+  return 0;
+}
 
 static int format_http_response(int status_code, const char** headers,
                                 size_t header_count, const uint8_t* body,
@@ -214,42 +429,45 @@ static void handle_new_connection(kevent_context_t* ctx) {
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
 
-  int client_fd =
-      accept(ctx->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
-  if (client_fd < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) return;
-    perror("accept");
-    return;
-  }
+  /* Accept up to 10 connections per wakeup to handle connection bursts */
+  for (int i = 0; i < 10; i++) {
+    int client_fd =
+        accept(ctx->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
+    if (client_fd < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) return;
+      perror("accept");
+      return;
+    }
 
-  /* Set non-blocking */
-  if (set_nonblocking(client_fd) < 0) {
-    close(client_fd);
-    return;
-  }
+    /* Set non-blocking */
+    if (set_nonblocking(client_fd) < 0) {
+      close(client_fd);
+      continue;
+    }
 
-  /* Disable Nagle */
-  set_nodelay(client_fd);
+    /* TCP optimizations for latency */
+    set_nodelay(client_fd);
 
-  /* Get connection slot */
-  connection_t* conn =
-      get_connection(ctx->connections, ctx->max_connections, client_fd);
-  if (conn == NULL) {
-    close(client_fd);
-    return;
-  }
+    /* Get connection slot */
+    connection_t* conn =
+        get_connection(ctx->connections, ctx->max_connections, client_fd);
+    if (conn == NULL) {
+      close(client_fd);
+      continue;
+    }
 
-  /* Notify JS layer */
-  if (ctx->on_connection) {
-    ctx->on_connection(conn, 0, ctx->user_data); /* 0 = open */
-  }
+    /* Notify JS layer */
+    if (ctx->on_connection) {
+      ctx->on_connection(conn, 0, ctx->user_data); /* 0 = open */
+    }
 
-  /* Add to kqueue for reading */
-  struct kevent ev;
-  EV_SET(&ev, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, conn);
-  if (kevent(ctx->kq, &ev, 1, NULL, 0, NULL) < 0) {
-    close_connection(ctx, client_fd);
-    return;
+    /* Add to kqueue for reading */
+    struct kevent ev;
+    EV_SET(&ev, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, conn);
+    if (kevent(ctx->kq, &ev, 1, NULL, 0, NULL) < 0) {
+      close_connection(ctx, client_fd);
+      continue;
+    }
   }
 }
 
@@ -295,43 +513,105 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
 
   conn->buffer_len += n;
 
-  /* Try to parse request */
-  parse_result_t result;
-  int status = http_parse_request(conn->buffer, conn->buffer_len, &result);
+  /* B5: HTTP Pipeline batching - process multiple requests in a loop */
+  int requests_processed = 0;
+  const int max_pipeline_batch =
+      4; /* Process up to 4 pipelined requests per event */
 
-  if (status == PARSE_STATUS_ERROR) {
-    /* Bad request - send 400 */
-    const char* headers[] = {"Connection", "close", NULL};
-    uint8_t response[256];
-    size_t response_len;
-    format_http_response(400, headers, 2, NULL, 0, response, sizeof(response),
-                         &response_len);
-    write(fd, response, response_len);
-    close_connection(ctx, fd);
-    return;
-  }
+  while (requests_processed < max_pipeline_batch) {
+    /* Try to parse request */
+    parse_result_t result;
+    int status = http_parse_request(conn->buffer, conn->buffer_len, &result);
 
-  if (status == PARSE_STATUS_NEED_MORE) {
-    /* Need more data - continue reading */
-    conn->body_remaining = result.body_length;
-    return;
-  }
-
-  if (status == PARSE_STATUS_DONE) {
-    /* Request complete - notify JS layer */
-    conn->request_complete = true;
-    conn->body_start = result.body_start;
-    conn->keep_alive = result.http_minor >= 1; /* HTTP/1.1 default keep-alive */
-
-    /* Store parse result in connection for JS callback */
-    conn->platform_ctx = malloc(sizeof(parse_result_t));
-    if (conn->platform_ctx) {
-      memcpy(conn->platform_ctx, &result, sizeof(result));
+    if (status == PARSE_STATUS_ERROR) {
+      /* Bad request - send 400 */
+      const char* headers[] = {"Connection", "close", NULL};
+      uint8_t response[256];
+      size_t response_len;
+      format_http_response(400, headers, 2, NULL, 0, response, sizeof(response),
+                           &response_len);
+      write(fd, response, response_len);
+      close_connection(ctx, fd);
+      return;
     }
 
-    /* Call JS callback (threadsafe) */
-    if (ctx->on_request) {
-      ctx->on_request(conn, &result, ctx->user_data);
+    if (status == PARSE_STATUS_NEED_MORE) {
+      /* Need more data - continue reading */
+      conn->body_remaining = result.body_length;
+      return;
+    }
+
+    if (status == PARSE_STATUS_DONE) {
+      /* Request complete - notify JS layer */
+      conn->request_complete = true;
+      conn->body_start = result.body_start;
+      conn->keep_alive =
+          result.http_minor >= 1; /* HTTP/1.1 default keep-alive */
+
+      /* B9: For chunked encoding, assemble body into a contiguous buffer */
+      if (result.body_present && result.body_length > 0) {
+        /* Chunked body - assemble if not already done */
+        if (!conn->assembled_body) {
+          size_t assembled_len = 0;
+          uint8_t* assembled = assemble_chunked_body(
+              conn->buffer + result.body_start,
+              conn->buffer_len - result.body_start, &assembled_len);
+          if (assembled && assembled_len > 0) {
+            conn->assembled_body = assembled;
+            conn->assembled_body_len = assembled_len;
+          }
+        }
+      }
+
+      /* Store parse result - just reference, no malloc */
+      conn->body_start = result.body_start;
+      conn->body_remaining = result.body_length;
+      conn->request_complete = true;
+
+      /* Call JS callback (threadsafe) */
+      if (ctx->on_request) {
+        ctx->on_request(conn, &result, ctx->user_data);
+      }
+
+      requests_processed++;
+
+      /* Calculate remaining data after this request */
+      size_t consumed = result.bytes_consumed;
+
+      if (result.body_present && conn->assembled_body) {
+        /* For chunked: need to find actual end (including terminator) */
+        const char* body_start = (const char*)conn->buffer + result.body_start;
+        size_t body_len = conn->buffer_len - result.body_start;
+        const char* term = memmem(body_start, body_len, "0\r\n\r\n", 5);
+        if (term) {
+          consumed = result.body_start + (term - body_start) + 5;
+        }
+      } else if (result.body_present && result.body_length > 0) {
+        consumed = result.body_start + result.body_length;
+      }
+
+      /* Check for pipelined requests */
+      if (conn->buffer_len > consumed) {
+        /* More data available - shift buffer and process next request */
+        size_t remaining = conn->buffer_len - consumed;
+        memmove(conn->buffer, conn->buffer + consumed, remaining);
+        conn->buffer_len = remaining;
+
+        /* Reset connection state for next request */
+        conn->request_complete = false;
+        conn->headers_sent = false;
+        /* Free assembled body if any */
+        if (conn->assembled_body) {
+          free(conn->assembled_body);
+          conn->assembled_body = NULL;
+          conn->assembled_body_len = 0;
+        }
+        /* Continue loop to process next pipelined request */
+      } else {
+        /* No more data - reset buffer */
+        conn->buffer_len = 0;
+        return; /* Done with this event */
+      }
     }
   }
 }
@@ -343,10 +623,10 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
 
 static void* event_loop_thread(void* arg) {
   kevent_context_t* ctx = (kevent_context_t*)arg;
-  struct kevent events[64];
+  struct kevent events[256];
 
   while (ctx->running) {
-    int nev = kevent(ctx->kq, NULL, 0, events, 64, NULL);
+    int nev = kevent(ctx->kq, NULL, 0, events, 256, NULL);
 
     if (nev < 0) {
       if (errno == EINTR) continue;
@@ -358,10 +638,34 @@ static void* event_loop_thread(void* arg) {
       struct kevent* ev = &events[i];
 
       if ((int)ev->ident == ctx->listen_fd) {
-        /* New connection */
-        handle_new_connection(ctx);
+        /* New connection - accept all pending */
+        int accepted = 0;
+        while (accepted < 64) {
+          struct sockaddr_in client_addr;
+          socklen_t addr_len = sizeof(client_addr);
+          int client_fd =
+              accept(ctx->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
+          if (client_fd < 0) break;
+
+          set_nonblocking(client_fd);
+          set_nodelay(client_fd);
+
+          connection_t* conn =
+              get_connection(ctx->connections, ctx->max_connections, client_fd);
+          if (conn) {
+            if (ctx->on_connection) ctx->on_connection(conn, 0, ctx->user_data);
+
+            struct kevent new_ev;
+            EV_SET(&new_ev, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0,
+                   conn);
+            kevent(ctx->kq, &new_ev, 1, NULL, 0, NULL);
+          } else {
+            close(client_fd);
+          }
+          accepted++;
+        }
       } else {
-        /* Client socket readable */
+        /* Client socket readable - process all available data */
         connection_t* conn = (connection_t*)ev->udata;
         if (conn && conn->fd == (int)ev->ident) {
           handle_client_read(ctx, ev->ident, conn);
@@ -413,6 +717,9 @@ server_handle_t server_init(const server_config_t* config,
     free(server);
     return NULL;
   }
+
+  /* Initialize buffer pool for zero-allocation hot path */
+  init_buffer_pool();
 
   /* Mark all connections as unused */
   for (size_t i = 0; i < ctx->max_connections; i++) {
@@ -547,9 +854,16 @@ int server_send_response(server_handle_t server, connection_t* conn,
   }
   headers[header_count] = NULL;
 
-  if (format_http_response(response->status_code, headers, header_count,
-                           response->body, response->body_len, buf, sizeof(buf),
-                           &len) < 0) {
+  /* Use fast path for common case (no custom headers) */
+  if (header_count == 0) {
+    if (format_http_response_fast(response->status_code, response->body,
+                                  response->body_len, buf, sizeof(buf),
+                                  &len) < 0) {
+      return -1;
+    }
+  } else if (format_http_response(response->status_code, headers, header_count,
+                                  response->body, response->body_len, buf,
+                                  sizeof(buf), &len) < 0) {
     return -1;
   }
 
@@ -587,6 +901,18 @@ ssize_t server_read_body(server_handle_t server, connection_t* conn,
   }
 
   return n;
+}
+
+connection_t* server_get_connection_by_fd(server_handle_t server, int fd) {
+  if (server == NULL || fd < 0) return NULL;
+
+  kevent_context_t* ctx = &server->ctx;
+  if ((size_t)fd >= ctx->max_connections) return NULL;
+
+  connection_t* conn = &ctx->connections[fd];
+  if (conn->fd != fd) return NULL; /* Connection slot not active for this fd */
+
+  return conn;
 }
 
 const char* server_get_platform(void) { return "kqueue"; }

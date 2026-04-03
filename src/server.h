@@ -127,6 +127,9 @@ typedef struct {
   /** Connection has been closed */
   bool closed;
 
+  /** Uses pre-allocated pool buffer */
+  bool uses_pool_buffer;
+
   /** User data pointer (for JS request reference) */
   void* user_data;
 
@@ -135,6 +138,10 @@ typedef struct {
 
   /** Offset in buffer where body starts (set by parser) */
   size_t body_start;
+
+  /** Assembled chunked body (malloc'd, freed after request) */
+  uint8_t* assembled_body;
+  size_t assembled_body_len;
 } connection_t;
 
 /**
@@ -306,6 +313,18 @@ int server_stop(server_handle_t server, uint32_t timeout_ms);
  */
 int server_send_response(server_handle_t server, connection_t* conn,
                          const response_t* response);
+
+/**
+ * Get connection by file descriptor.
+ *
+ * Looks up the connection structure for a given fd from the server's
+ * connection pool. Returns NULL if fd is invalid or connection closed.
+ *
+ * @param server Server handle
+ * @param fd File descriptor to look up
+ * @return Connection pointer or NULL if not found/closed
+ */
+connection_t* server_get_connection_by_fd(server_handle_t server, int fd);
 
 /**
  * Read more body data from a streaming request.

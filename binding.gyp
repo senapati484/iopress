@@ -10,13 +10,11 @@
       ],
       "cflags": [
         "-O3",
-        "-march=native",
         "-funroll-loops",
         "-fomit-frame-pointer"
       ],
       "cflags_cc": [
         "-O3",
-        "-march=native",
         "-funroll-loops",
         "-fomit-frame-pointer"
       ],
@@ -47,7 +45,6 @@
             "xcode_settings": {
               "GCC_OPTIMIZATION_LEVEL": "3",
               "OTHER_CFLAGS": [
-                "-march=native",
                 "-funroll-loops",
                 "-fomit-frame-pointer"
               ]

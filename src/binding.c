@@ -12,10 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
+#include "fast_router.h"
 #include "parser.h"
 #include "server.h"
-#include "fast_router.h"
 
 /* ============================================================================
  * Thread-Safe Function Context
@@ -50,6 +51,12 @@ typedef struct {
   uint8_t* body;
   size_t body_len;
   int handler_index;
+  /* Headers as simple key-value pairs (max 32 headers, 256 chars each) */
+  char header_keys[32][64];
+  char header_values[32][256];
+  int header_count;
+  /* Connection pointer - passed through TSFN to avoid race condition */
+  connection_t* conn;
 } request_data_t;
 
 /* ============================================================================
@@ -96,6 +103,74 @@ static void init_fast_cache(void) {
   cache_initialized = 1;
 }
 
+/* ============================================================================
+ * HTTP Header Parsing
+ * ============================================================================
+ */
+
+/**
+ * Parse headers from HTTP request buffer.
+ * Returns number of headers parsed.
+ */
+static int parse_headers(const uint8_t* buffer, size_t len, char keys[][64],
+                         char values[][256], int max_count) {
+  /* Find end of request line (first \r\n) */
+  const uint8_t* p = buffer;
+  const uint8_t* end = buffer + len;
+
+  /* Skip request line */
+  while (p < end && *p != '\r') p++;
+  if (p < end && *p == '\r') p++; /* Skip \r */
+  if (p < end && *p == '\n') p++; /* Skip \n */
+
+  int count = 0;
+  while (p < end && count < max_count) {
+    /* Check for end of headers (empty line) */
+    if (p + 1 < end && *p == '\r' && *(p + 1) == '\n') {
+      break;
+    }
+
+    /* Find colon */
+    const uint8_t* colon = p;
+    while (colon < end && *colon != ':' && *colon != '\r') colon++;
+
+    if (colon >= end || *colon != ':') break;
+
+    /* Copy key (trim whitespace) */
+    size_t key_len = colon - p;
+    if (key_len >= 64) key_len = 63;
+    memcpy(keys[count], p, key_len);
+    keys[count][key_len] = '\0';
+
+    /* Skip colon and whitespace */
+    const uint8_t* val = colon + 1;
+    while (val < end && (*val == ' ' || *val == '\t')) val++;
+
+    /* Find end of value */
+    const uint8_t* val_end = val;
+    while (val_end < end && *val_end != '\r') val_end++;
+
+    /* Copy value (trim trailing whitespace) */
+    size_t val_len = val_end - val;
+    while (val_len > 0 &&
+           (*(val + val_len - 1) == ' ' || *(val + val_len - 1) == '\t')) {
+      val_len--;
+    }
+    if (val_len >= 256) val_len = 255;
+    memcpy(values[count], val, val_len);
+    values[count][val_len] = '\0';
+
+    count++;
+
+    /* Move to next line */
+    p = val_end;
+    if (p < end && *p == '\r') p++;
+    if (p < end && *p == '\n') p++;
+  }
+
+  return count;
+}
+
 static fast_path_cache_t* find_in_cache(const char* path, size_t path_len) {
   if (!cache_initialized) init_fast_cache();
 
@@ -126,10 +201,10 @@ static int on_request_c_handler(connection_t* conn,
   size_t fast_response_len = 0;
   uint16_t fast_status = 200;
 
-  int fast_result = fast_router_try_handle(
-      (const char*)result->method, result->method_len,
-      (const char*)result->path, result->path_len,
-      &fast_response, &fast_response_len, &fast_status);
+  int fast_result =
+      fast_router_try_handle((const char*)result->method, result->method_len,
+                             (const char*)result->path, result->path_len,
+                             &fast_response, &fast_response_len, &fast_status);
 
   if (fast_result == 0) {
     /* Handled in C! No JavaScript crossing */
@@ -166,17 +241,29 @@ static int on_request_c_handler(connection_t* conn,
     req_data->query[query_len] = '\0';
   }
 
-  /* Copy body */
+  /* Parse headers from request buffer */
+  req_data->header_count =
+      parse_headers(conn->buffer, conn->buffer_len, req_data->header_keys,
+                    req_data->header_values, 32);
+
+  /* Copy body - use assembled body for chunked encoding if available */
   if (result->body_present && result->body_length > 0) {
     req_data->body = malloc(result->body_length);
     if (req_data->body) {
-      memcpy(req_data->body, conn->buffer + result->body_start,
-             result->body_length);
+      if (conn->assembled_body) {
+        /* Use pre-assembled chunked body */
+        memcpy(req_data->body, conn->assembled_body, result->body_length);
+      } else {
+        /* Normal body from buffer */
+        memcpy(req_data->body, conn->buffer + result->body_start,
+               result->body_length);
+      }
       req_data->body_len = result->body_length;
     }
   }
 
-  g_context.current_conn = conn;
+  /* Store connection in request data to avoid race condition */
+  req_data->conn = conn;
 
   /* Call thread-safe function (non-blocking) */
   napi_call_threadsafe_function(g_context.tsfn, req_data,
@@ -224,6 +311,18 @@ static void on_request_js_callback(napi_env env, napi_value js_callback,
   napi_create_string_utf8(env, req_data->query, NAPI_AUTO_LENGTH, &query_val);
   napi_set_named_property(env, req_obj, "query", query_val);
 
+  /* req.headers */
+  napi_value headers_obj;
+  napi_create_object(env, &headers_obj);
+  for (int i = 0; i < req_data->header_count; i++) {
+    napi_value header_val;
+    napi_create_string_utf8(env, req_data->header_values[i], NAPI_AUTO_LENGTH,
+                            &header_val);
+    napi_set_named_property(env, headers_obj, req_data->header_keys[i],
+                            header_val);
+  }
+  napi_set_named_property(env, req_obj, "headers", headers_obj);
+
   /* req.body */
   if (req_data->body && req_data->body_len > 0) {
     napi_value body_val;
@@ -237,10 +336,15 @@ static void on_request_js_callback(napi_env env, napi_value js_callback,
   napi_create_int32(env, req_data->fd, &fd_val);
   napi_set_named_property(env, req_obj, "fd", fd_val);
 
-  /* Build response object with fd attached */
+  /* Build response object with fd and conn attached */
   napi_value res_fd_val;
   napi_create_int32(env, req_data->fd, &res_fd_val);
   napi_set_named_property(env, res_obj, "fd", res_fd_val);
+
+  /* Store connection pointer as external - avoids race condition */
+  napi_value res_conn_val;
+  napi_create_external(env, req_data->conn, NULL, NULL, &res_conn_val);
+  napi_set_named_property(env, res_obj, "_conn", res_conn_val);
 
   /* Build response object with methods */
   napi_value status_fn, send_fn;
@@ -314,11 +418,11 @@ napi_value res_send_wrapper(napi_env env, napi_callback_info info) {
     napi_get_value_int32(env, status_val, &status);
   }
 
-  /* Get fd from res._fd */
-  napi_value fd_val;
-  int32_t fd = -1;
-  if (napi_get_named_property(env, this_val, "_fd", &fd_val) == napi_ok) {
-    napi_get_value_int32(env, fd_val, &fd);
+  /* Get connection from res._conn (external) */
+  connection_t* conn = NULL;
+  napi_value conn_val;
+  if (napi_get_named_property(env, this_val, "_conn", &conn_val) == napi_ok) {
+    napi_get_value_external(env, conn_val, (void**)&conn);
   }
 
   /* Get body */
@@ -337,9 +441,9 @@ napi_value res_send_wrapper(napi_env env, napi_callback_info info) {
   resp.body_len = body_len;
   resp.is_last = true;
 
-  /* Send using stored connection */
-  if (g_context.server && g_context.current_conn) {
-    server_send_response(g_context.server, g_context.current_conn, &resp);
+  /* Send using connection from response object (no race condition) */
+  if (g_context.server && conn) {
+    server_send_response(g_context.server, conn, &resp);
   }
 
   free(body_str);
@@ -390,7 +494,8 @@ napi_value RegisterFastRoute(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, NULL, NULL);
 
   if (argc < 4) {
-    napi_throw_error(env, NULL, "Expected 4 args: method, path, statusCode, response");
+    napi_throw_error(env, NULL,
+                     "Expected 4 args: method, path, statusCode, response");
     return NULL;
   }
 
@@ -411,7 +516,8 @@ napi_value RegisterFastRoute(napi_env env, napi_callback_info info) {
   /* Get response body */
   char response[4096];
   size_t response_len;
-  napi_get_value_string_utf8(env, args[3], response, sizeof(response), &response_len);
+  napi_get_value_string_utf8(env, args[3], response, sizeof(response),
+                             &response_len);
 
   /* Register with fast router */
   fast_router_register(method, path, ROUTE_TYPE_STATIC_JSON, status,
@@ -495,13 +601,11 @@ napi_value Listen(napi_env env, napi_callback_info info) {
 }
 
 napi_value SendResponse(napi_env env, napi_callback_info info) {
-  (void)env;
-
-  size_t argc = 3;
-  napi_value args[3];
+  size_t argc = 5;
+  napi_value args[5];
   napi_get_cb_info(env, info, &argc, args, NULL, NULL);
 
-  /* Get fd (not used directly, we use current_conn) */
+  /* Get fd */
   int32_t fd;
   napi_get_value_int32(env, args[0], &fd);
 
@@ -510,23 +614,84 @@ napi_value SendResponse(napi_env env, napi_callback_info info) {
   napi_get_value_int32(env, args[1], &status);
 
   /* Get body */
-  char body[4096];
-  size_t body_len;
-  napi_get_value_string_utf8(env, args[2], body, sizeof(body), &body_len);
-
-  /* Build response */
-  response_t resp = {0};
-  resp.status_code = status;
-  resp.body = (uint8_t*)body;
-  resp.body_len = body_len;
-  resp.is_last = true;
-
-  /* Send using current connection */
-  if (g_context.server && g_context.current_conn) {
-    server_send_response(g_context.server, g_context.current_conn, &resp);
+  char body[16384];
+  size_t body_len = 0;
+  if (argc > 2 && args[2] != NULL) {
+    napi_get_value_string_utf8(env, args[2], body, sizeof(body), &body_len);
   }
 
-  return NULL;
+  /* Get headers (object with key-value pairs) */
+  char headers_buf[4096];
+  size_t headers_len = 0;
+  if (argc > 3 && args[3] != NULL) {
+    napi_value headers_obj = args[3];
+    napi_value keys;
+    napi_get_property_names(env, headers_obj, &keys);
+
+    uint32_t key_count;
+    napi_get_array_length(env, keys, &key_count);
+
+    for (uint32_t i = 0;
+         i < key_count && headers_len < sizeof(headers_buf) - 256; i++) {
+      napi_value key_val;
+      napi_get_element(env, keys, i, &key_val);
+
+      char key[64], value[256];
+      size_t key_len, value_len;
+      napi_get_value_string_utf8(env, key_val, key, sizeof(key), &key_len);
+
+      napi_value val;
+      napi_get_named_property(env, headers_obj, key, &val);
+      napi_get_value_string_utf8(env, val, value, sizeof(value), &value_len);
+
+      int written =
+          snprintf(headers_buf + headers_len, sizeof(headers_buf) - headers_len,
+                   "%s: %s\r\n", key, value);
+      if (written > 0) {
+        headers_len += written;
+      }
+    }
+  }
+
+  /* Send using connection looked up by fd (avoids race condition) */
+  if (g_context.server && fd >= 0) {
+    /* Look up connection by fd in the server's connection pool */
+    connection_t* conn = server_get_connection_by_fd(g_context.server, fd);
+
+    if (conn) {
+      /* Build HTTP response manually since server_send_response doesn't support
+       * custom headers well */
+      int conn_fd = conn->fd;
+
+      char response[32768];
+      int len = snprintf(
+          response, sizeof(response),
+          "HTTP/1.1 %d %s\r\n"
+          "%s" /* Custom headers */
+          "Content-Length: %zu\r\n"
+          "\r\n",
+          status, status < 400 ? "OK" : (status < 500 ? "Not Found" : "Error"),
+          headers_len > 0 ? headers_buf : "", body_len);
+
+      /* Send headers */
+      write(conn_fd, response, len);
+
+      /* Send body */
+      if (body_len > 0) {
+        write(conn_fd, body, body_len);
+      }
+
+      /* Close if not keep-alive */
+      if (!conn->keep_alive) {
+        close(conn_fd);
+        conn->fd = -1;
+      }
+    }
+  }
+
+  napi_value result;
+  napi_get_undefined(env, &result);
+  return result;
 }
 
 napi_value SetServerOptions(napi_env env, napi_callback_info info) {
@@ -584,8 +749,8 @@ napi_value Init(napi_env env, napi_value exports) {
   napi_set_named_property(env, exports, "RegisterRoute", fn);
 
   /* RegisterFastRoute */
-  napi_create_function(env, "RegisterFastRoute", NAPI_AUTO_LENGTH, RegisterFastRoute,
-                       NULL, &fn);
+  napi_create_function(env, "RegisterFastRoute", NAPI_AUTO_LENGTH,
+                       RegisterFastRoute, NULL, &fn);
   napi_set_named_property(env, exports, "RegisterFastRoute", fn);
 
   /* Listen */
