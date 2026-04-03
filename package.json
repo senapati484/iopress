@@ -1,5 +1,5 @@
 {
-  "name": "@sayansenapati/iopress",
+  "name": "@iopress/core",
   "version": "0.0.1",
   "description": "Ultra-fast HTTP framework powered by io_uring and C native addons. 30x faster than Express.",
   "main": "index.js",
