@@ -30,7 +30,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ## Installation
 
 ```bash
-npm install expressmax
+npm install maxpress
 ```
 
 ### Platform Prerequisites
@@ -58,10 +58,10 @@ npm install expressmax
 ## Quickstart
 
 ```javascript
-const expressmax = require('expressmax');
+const maxpress = require('maxpress');
 
 // Create application instance
-const app = expressmax();
+const app = maxpress();
 
 // Middleware support
 app.use((req, res, next) => {
@@ -107,13 +107,13 @@ app.listen(3000, () => {
 Creates a new ExpressMax application instance.
 
 ```javascript
-const expressmax = require('expressmax');
+const maxpress = require('maxpress');
 
 // Default options
-const app = expressmax();
+const app = maxpress();
 
 // With custom options
-const app = expressmax({
+const app = maxpress({
   initialBufferSize: 32768,
   maxBodySize: 5242880,  // 5MB
   streamBody: false
@@ -347,11 +347,11 @@ res.end('Final chunk');
 ### Module Properties
 
 ```javascript
-const expressmax = require('expressmax');
+const maxpress = require('maxpress');
 
-console.log(expressmax.version);   // '1.0.0'
-console.log(expressmax.platform);  // 'linux', 'darwin', 'win32'
-console.log(expressmax.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
+console.log(maxpress.version);   // '1.0.0'
+console.log(maxpress.platform);  // 'linux', 'darwin', 'win32'
+console.log(maxpress.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
 ```
 
 ## Configuration Options
@@ -371,7 +371,7 @@ Increase this value if:
 
 ```javascript
 // For APIs with large headers (JWT tokens, etc.)
-const app = expressmax({
+const app = maxpress({
   initialBufferSize: 65536  // 64KB
 });
 ```
@@ -385,7 +385,7 @@ Increase this value if:
 
 ```javascript
 // For file upload server
-const app = expressmax({
+const app = maxpress({
   maxBodySize: 50 * 1024 * 1024  // 50MB
 });
 ```
@@ -402,7 +402,7 @@ Enable streaming if:
 
 ```javascript
 // For streaming/proxy use cases
-const app = expressmax({
+const app = maxpress({
   streamBody: true,
   maxBodySize: 100 * 1024 * 1024  // Still needed for max protection
 });
@@ -435,8 +435,8 @@ ExpressMax automatically selects the best available backend:
 ### Checking Your Backend
 
 ```javascript
-const app = expressmax();
-console.log(expressmax.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
+const app = maxpress();
+console.log(maxpress.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 ```
 
 ## Migrating from Express
@@ -455,7 +455,7 @@ ExpressMax is designed to be API-compatible with Express.js for common use cases
 
 | Feature | Express.js | ExpressMax |
 |---------|-----------|-------------|
-| Create app | `const app = express()` | `const app = expressmax()` |
+| Create app | `const app = express()` | `const app = maxpress()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
 | Static files | `express.static()` | Not included (use nginx/CDN) |
 | View engine | Built-in | Not included (API-focused) |
@@ -482,8 +482,8 @@ app.listen(3000);
 
 **ExpressMax:**
 ```javascript
-const expressmax = require('expressmax');
-const app = expressmax();
+const maxpress = require('maxpress');
+const app = maxpress();
 
 // No need for express.json() - body parsing is built-in
 
@@ -509,8 +509,8 @@ app.listen(3000);
 
 ```bash
 # Clone the repository
-git clone https://github.com/senapati484/expressmax.git
-cd expressmax
+git clone https://github.com/senapati484/maxpress.git
+cd maxpress
 
 # Install dependencies
 npm install

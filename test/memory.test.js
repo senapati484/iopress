@@ -11,7 +11,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
-const expressmax = require('../js/index.js');
+const maxpress = require('../js/index.js');
 
 const TEST_PORT = 3462;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -48,7 +48,7 @@ describe('Memory Leak Tests', () => {
   let server;
 
   before(async () => {
-    app = expressmax();
+    app = maxpress();
 
     // Various endpoints for testing
     app.get('/health', (req, res) => {

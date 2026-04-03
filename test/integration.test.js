@@ -10,7 +10,7 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const expressmax = require('../js/index.js');
+const maxpress = require('../js/index.js');
 
 const TEST_PORT = 3459;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -21,7 +21,7 @@ describe('ExpressMax Integration Tests', () => {
 
   // Setup: Create app and start server before all tests
   before(async () => {
-    app = expressmax();
+    app = maxpress();
 
     // Health check endpoint
     app.get('/health', (req, res) => {
@@ -331,13 +331,13 @@ describe('ExpressMax Integration Tests', () => {
 
   describe('Server Info', () => {
     it('should expose version', () => {
-      assert.strictEqual(typeof expressmax.version, 'string');
-      assert.ok(expressmax.version.length > 0);
+      assert.strictEqual(typeof maxpress.version, 'string');
+      assert.ok(maxpress.version.length > 0);
     });
 
     it('should expose platform', () => {
-      assert.strictEqual(typeof expressmax.platform, 'string');
-      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(expressmax.platform));
+      assert.strictEqual(typeof maxpress.platform, 'string');
+      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(maxpress.platform));
     });
   });
 });

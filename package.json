@@ -1,5 +1,5 @@
 {
-  "name": "expressmax",
+  "name": "maxpress",
   "version": "1.0.0",
   "description": "High-performance native HTTP server - 8x faster than Express.js",
   "main": "index.js",
@@ -44,10 +44,10 @@
   ],
   "author": "senapati484 <senapati484@example.com>",
   "license": "MIT",
-  "homepage": "https://github.com/senapati484/expressmax#readme",
+  "homepage": "https://github.com/senapati484/maxpress#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/senapati484/expressmax.git"
+    "url": "https://github.com/senapati484/maxpress.git"
   },
   "dependencies": {},
   "devDependencies": {

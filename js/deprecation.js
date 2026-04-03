@@ -1,5 +1,5 @@
 /**
- * Deprecation warning utilities for expressmax
+ * Deprecation warning utilities for maxpress
  * @module deprecation
  */
 

@@ -10,7 +10,7 @@
 'use strict';
 
 const http = require('http');
-const expressmax = require('../js/index.js');
+const maxpress = require('../js/index.js');
 
 // Platform detection
 const platform = process.platform;
@@ -196,7 +196,7 @@ async function main() {
 
   // Create app and start server
   log('Starting server...', 'blue');
-  const app = expressmax();
+  const app = maxpress();
 
   // Try to register fast route for /health (bypasses JavaScript entirely)
   const native = require('../build/Release/express_pro_native');

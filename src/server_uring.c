@@ -1,5 +1,5 @@
 /**
- * expressmax io_uring Backend (Linux)
+ * maxpress io_uring Backend (Linux)
  *
  * High-performance Linux backend using io_uring for async I/O.
  *

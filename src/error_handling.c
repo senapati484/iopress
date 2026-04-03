@@ -81,7 +81,7 @@ napi_status napi_throw(napi_env env, napi_value error);
  */
 
 /**
- * Map system errors to expressmax error codes.
+ * Map system errors to maxpress error codes.
  *
  * @param sys_errno The errno value from system call
  * @return Machine-readable error code string
@@ -253,7 +253,7 @@ int send_auto_http_error(connection_t* conn, int http_status,
  * 3. If not auto-respond: queue error to JS via threadsafe function
  *
  * @param conn Connection handle
- * @param error_code expressmax error code
+ * @param error_code maxpress error code
  * @param error_message Human-readable message
  * @return true if connection should be closed
  */

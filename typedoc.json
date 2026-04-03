@@ -2,7 +2,7 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["js/index.js"],
   "out": "docs",
-  "name": "expressmax",
+  "name": "maxpress",
   "includeVersion": true,
   "excludeExternals": true,
   "excludePrivate": false,
@@ -49,6 +49,6 @@
   "searchInComments": true,
   "searchInDocuments": true,
   "highlightLanguages": ["javascript", "typescript", "json"],
-  "sourceLinkTemplate": "https://github.com/senapati484/expressmax/blob/main/{path}#L{line}",
+  "sourceLinkTemplate": "https://github.com/senapati484/maxpress/blob/main/{path}#L{line}",
   "gitRevision": "main"
 }

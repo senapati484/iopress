@@ -39,9 +39,9 @@
 
 'use strict';
 
-const expressmax = require('../index.js');
+const maxpress = require('../index.js');
 
-const app = expressmax();
+const app = maxpress();
 
 // Store for request IDs
 const requestStore = new Map();

@@ -1,5 +1,5 @@
 /**
- * expressmax Parser Unit Tests
+ * maxpress Parser Unit Tests
  *
  * Standalone C test suite for parser.c
  *
@@ -490,7 +490,7 @@ void test_partial_headers(void) {
  */
 int main(void) {
   printf("============================================================\n");
-  printf("  expressmax Parser Unit Tests\n");
+  printf("  maxpress Parser Unit Tests\n");
   printf("============================================================\n\n");
 
   /* Run all tests */

@@ -10,7 +10,7 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const expressmax = require('../js/index.js');
+const maxpress = require('../js/index.js');
 
 const TEST_PORT = 3460;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -20,7 +20,7 @@ describe('Large Body Tests', () => {
   let server;
 
   before(async () => {
-    app = expressmax();
+    app = maxpress();
 
     // Echo endpoint
     app.post('/echo', (req, res) => {

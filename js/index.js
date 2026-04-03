@@ -1,17 +1,17 @@
 /**
- * expressmax JavaScript API
+ * maxpress JavaScript API
  *
  * High-performance native HTTP server with Express-compatible API.
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
- * @module expressmax
+ * @module maxpress
  * @version 1.0.0
  * @license ISC
  * @author senapati484
  *
  * @example
- * const expressmax = require('expressmax');
- * const app = expressmax();
+ * const maxpress = require('maxpress');
+ * const app = maxpress();
  *
  * app.get('/hello', (req, res) => {
  *   res.json({ message: 'Hello World' });
@@ -384,7 +384,7 @@ class Response {
 }
 
 /**
- * expressmax Application Class.
+ * maxpress Application Class.
  *
  * Main application class for creating HTTP servers with Express-compatible API.
  * Supports middleware, routing, error handling, and method chaining.
@@ -393,7 +393,7 @@ class Response {
  * @since 1.0.0
  *
  * @example
- * const app = expressmax();
+ * const app = maxpress();
  *
  * // Middleware
  * app.use((req, res, next) => {
@@ -418,14 +418,14 @@ class ExpressMax {
 /**
  * ExpressMax - High-Performance Native HTTP Server
  *
- * @module expressmax
+ * @module maxpress
  * @description A blazing fast native HTTP server that uses platform-specific
  *              async I/O backends (io_uring on Linux, kqueue on macOS, IOCP on Windows)
  *              to deliver 8x+ performance compared to Express.js.
  *
  * @example
- * const expressmax = require('expressmax');
- * const app = expressmax();
+ * const maxpress = require('maxpress');
+ * const app = maxpress();
  *
  * app.get('/', (req, res) => res.json({ message: 'Hello, World!' }));
  * app.listen(3000);
@@ -851,13 +851,13 @@ class ExpressMax {
  * Creates and returns a new ExpressMax application instance.
  * This is the default export and recommended way to create apps.
  *
- * @function expressmax
+ * @function maxpress
  * @returns {ExpressMax} New ExpressMax application instance
  * @since 1.0.0
  *
  * @example
- * const expressmax = require('expressmax');
- * const app = expressmax();
+ * const maxpress = require('maxpress');
+ * const app = maxpress();
  *
  * app.get('/', (req, res) => {
  *   res.json({ hello: 'world' });
@@ -865,7 +865,7 @@ class ExpressMax {
  *
  * app.listen(3000);
  */
-function expressmax() {
+function maxpress() {
   return new ExpressMax();
 }
 
@@ -875,7 +875,7 @@ function expressmax() {
  * @since 1.0.0
  * @static
  */
-expressmax.version = native.version;
+maxpress.version = native.version;
 
 /**
  * Current platform identifier.
@@ -883,7 +883,7 @@ expressmax.version = native.version;
  * @since 1.0.0
  * @static
  */
-expressmax.platform = native.platform;
+maxpress.platform = native.platform;
 
 /**
  * Async I/O backend being used.
@@ -897,7 +897,7 @@ expressmax.platform = native.platform;
  * @since 1.0.0
  * @static
  */
-expressmax.backend = native.backend;
+maxpress.backend = native.backend;
 
 /**
  * ExpressMax Application Class.
@@ -906,7 +906,7 @@ expressmax.backend = native.backend;
  * @since 1.0.0
  * @static
  */
-expressmax.expressmax = ExpressMax;
+maxpress.maxpress = ExpressMax;
 
 /**
  * Request Class.
@@ -915,7 +915,7 @@ expressmax.expressmax = ExpressMax;
  * @since 1.0.0
  * @static
  */
-expressmax.Request = Request;
+maxpress.Request = Request;
 
 /**
  * Response Class.
@@ -924,7 +924,7 @@ expressmax.Request = Request;
  * @since 1.0.0
  * @static
  */
-expressmax.Response = Response;
+maxpress.Response = Response;
 
 // Export module
-module.exports = expressmax;
+module.exports = maxpress;

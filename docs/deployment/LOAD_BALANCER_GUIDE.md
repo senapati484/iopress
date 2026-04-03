@@ -27,13 +27,13 @@ Traditional Setup: 3-4 Node processes load balanced
 - Additional hop latency (~0.5-2ms)
 - Operational complexity
 
-## expressmax Solution
+## maxpress Solution
 
-With expressmax's native performance, a **single process** can often replace multiple Node.js processes:
+With maxpress's native performance, a **single process** can often replace multiple Node.js processes:
 
 ```
 ┌─────────────┐         ┌─────────────┐
-│   Client    │────────▶│ expressmax │
+│   Client    │────────▶│ maxpress │
 │             │         │  (1 process)  │
 └─────────────┘         └─────────────┘
         │                        │
@@ -42,7 +42,7 @@ With expressmax's native performance, a **single process** can often replace mul
 
 ## Performance Comparison by Platform
 
-| Platform | expressmax | Express.js | Ratio |
+| Platform | maxpress | Express.js | Ratio |
 |----------|-------------|------------|-------|
 | **Linux (io_uring)** | **300k-500k req/s** | ~15k req/s | **20-33x** |
 | macOS (kqueue) | ~80k req/s | ~15k req/s | 5x |
@@ -52,11 +52,11 @@ With expressmax's native performance, a **single process** can often replace mul
 
 ### Single Server Scenarios
 
-If your traffic is under **300k req/s**, a single expressmax instance on Linux can handle it:
+If your traffic is under **300k req/s**, a single maxpress instance on Linux can handle it:
 
 ```javascript
 // Single process handling 300k req/s
-const app = expressmax();
+const app = maxpress();
 app.listen(80);  // That's it!
 ```
 
@@ -107,7 +107,7 @@ Use when:
 
 ### 2. Static File Serving
 
-expressmax is optimized for API requests. For static files, use nginx:
+maxpress is optimized for API requests. For static files, use nginx:
 
 ```nginx
 server {
@@ -119,7 +119,7 @@ server {
     }
     
     location /api/ {
-        # Proxy to expressmax
+        # Proxy to maxpress
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -129,7 +129,7 @@ server {
 
 ### 3. SSL/TLS Termination
 
-Until expressmax v2 adds native HTTPS:
+Until maxpress v2 adds native HTTPS:
 
 ```nginx
 server {
@@ -155,12 +155,12 @@ wrk -t4 -c400 -d30s http://your-api/endpoint
 # Note current: requests/sec, latency p99
 ```
 
-### Step 2: Deploy expressmax
+### Step 2: Deploy maxpress
 
 ```javascript
 // server.js
-const expressmax = require('expressmax');
-const app = expressmax();
+const maxpress = require('maxpress');
+const app = maxpress();
 
 // Your routes here
 app.get('/api/users', (req, res) => {
@@ -179,7 +179,7 @@ app.listen(3000, () => {
 ### Step 3: Performance Test
 
 ```bash
-# Test expressmax single instance
+# Test maxpress single instance
 wrk -t4 -c400 -d30s http://localhost:3000/api/users
 
 # Expected: 10-20x improvement over Express
@@ -188,8 +188,8 @@ wrk -t4 -c400 -d30s http://localhost:3000/api/users
 ### Step 4: Gradual Migration
 
 ```
-Phase 1: Deploy expressmax alongside existing setup
-Phase 2: Route 10% traffic to expressmax
+Phase 1: Deploy maxpress alongside existing setup
+Phase 2: Route 10% traffic to maxpress
 Phase 3: Monitor for 24h
 Phase 4: Route 100% traffic
 Phase 5: Remove load balancer (if single server)
@@ -206,7 +206,7 @@ Phase 5: Remove load balancer (if single server)
 | Operational complexity | High |
 | **Total** | **$200/month** |
 
-### After (expressmax)
+### After (maxpress)
 
 | Component | Cost/Month |
 |-----------|-----------|
@@ -219,7 +219,7 @@ Phase 5: Remove load balancer (if single server)
 
 ## Kubernetes Deployment
 
-### Without expressmax (Traditional)
+### Without maxpress (Traditional)
 
 ```yaml
 apiVersion: apps/v1
@@ -248,7 +248,7 @@ spec:
   - port: 80
 ```
 
-### With expressmax
+### With maxpress
 
 ```yaml
 apiVersion: apps/v1
@@ -260,8 +260,8 @@ spec:
   template:
     spec:
       containers:
-      - name: expressmax
-        image: expressmax:latest
+      - name: maxpress
+        image: maxpress:latest
         resources:
           requests:
             memory: "256Mi"
@@ -304,9 +304,9 @@ setInterval(() => {
 
 | Traffic | Recommendation |
 |---------|---------------|
-| < 50k req/s | Single expressmax process, no load balancer |
-| 50k-300k req/s | Single expressmax process, monitor closely |
-| 300k+ req/s | Multiple expressmax instances with load balancer |
+| < 50k req/s | Single maxpress process, no load balancer |
+| 50k-300k req/s | Single maxpress process, monitor closely |
+| 300k+ req/s | Multiple maxpress instances with load balancer |
 | Global/multi-region | Multiple servers with geographic LB |
 
-**Bottom line:** expressmax eliminates load balancers for 95% of use cases!
+**Bottom line:** maxpress eliminates load balancers for 95% of use cases!

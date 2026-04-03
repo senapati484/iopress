@@ -1,6 +1,6 @@
-# Getting Started with expressmax
+# Getting Started with maxpress
 
-Welcome to expressmax! This guide will walk you through creating your first high-performance HTTP server using our native C++ HTTP engine.
+Welcome to maxpress! This guide will walk you through creating your first high-performance HTTP server using our native C++ HTTP engine.
 
 ## Table of Contents
 
@@ -27,15 +27,15 @@ Before you begin, ensure you have the following installed:
   - **macOS**: Install Xcode Command Line Tools (`xcode-select --install`)
   - **Windows**: Install Visual Studio Build Tools with "Desktop development with C++" workload
 
-### Install expressmax
+### Install maxpress
 
-Create a new directory for your project and install expressmax:
+Create a new directory for your project and install maxpress:
 
 ```bash
 mkdir my-first-server
 cd my-first-server
 npm init -y
-npm install expressmax
+npm install maxpress
 ```
 
 **Note**: On Linux, you may need `liburing-dev` for optimal performance:
@@ -51,21 +51,21 @@ Create a file named `server.js` in your project directory:
 
 ```javascript
 // server.js
-const expressmax = require('expressmax');
+const maxpress = require('maxpress');
 
 // Create an application instance
-const app = expressmax();
+const app = maxpress();
 
 // Define a route
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello from expressmax!' });
+  res.json({ message: 'Hello from maxpress!' });
 });
 
 // Start the server
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${expressmax.backend}`);
+  console.log(`Native backend: ${maxpress.backend}`);
 });
 ```
 
@@ -84,17 +84,17 @@ Native backend: kqueue  (or io_uring/iocp depending on your platform)
 Test it:
 ```bash
 curl http://localhost:3000/
-# Output: {"message":"Hello from expressmax!"}
+# Output: {"message":"Hello from maxpress!"}
 ```
 
 ---
 
 ## Basic Routing
 
-expressmax supports Express-style routing with HTTP methods:
+maxpress supports Express-style routing with HTTP methods:
 
 ```javascript
-const app = expressmax();
+const app = maxpress();
 
 // GET request
 app.get('/users', (req, res) => {
@@ -214,7 +214,7 @@ app.post('/users', (req, res) => {
 Middleware functions execute before your route handlers:
 
 ```javascript
-const app = expressmax();
+const app = maxpress();
 
 // Global middleware (runs on every request)
 app.use((req, res, next) => {
@@ -278,7 +278,7 @@ NODE_ENV=production node server.js
 Handle shutdown signals properly:
 
 ```javascript
-const app = expressmax();
+const app = maxpress();
 const server = app.listen(3000, () => {
   console.log('Server started');
 });
@@ -324,9 +324,9 @@ Here's a complete REST API example:
 
 ```javascript
 // api-server.js
-const expressmax = require('expressmax');
+const maxpress = require('maxpress');
 
-const app = expressmax();
+const app = maxpress();
 
 // In-memory "database"
 const users = [
@@ -342,7 +342,7 @@ app.use((req, res, next) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', backend: expressmax.backend });
+  res.json({ status: 'ok', backend: maxpress.backend });
 });
 
 // Get all users
@@ -416,7 +416,7 @@ app.onError((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API Server running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${expressmax.backend}`);
+  console.log(`Native backend: ${maxpress.backend}`);
 });
 ```
 
@@ -472,7 +472,7 @@ npm run build
 npm run configure && npm run build
 ```
 
-### "Cannot find module" for expressmax
+### "Cannot find module" for maxpress
 
 ```bash
 # Ensure you're in the correct directory
@@ -507,4 +507,4 @@ app.listen(3001);  # Use port 3001 instead
 
 **Happy Coding!** 🚀
 
-For more information, visit our [GitHub Repository](https://github.com/senapati484/expressmax).
+For more information, visit our [GitHub Repository](https://github.com/senapati484/maxpress).

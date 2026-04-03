@@ -1,5 +1,5 @@
 /**
- * expressmax HTTP Router Implementation
+ * maxpress HTTP Router Implementation
  *
  * O(k) trie-based router with :param support.
  *

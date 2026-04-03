@@ -1,5 +1,5 @@
 /**
- * expressmax - High-performance native HTTP server
+ * maxpress - High-performance native HTTP server
  * TypeScript declarations
  */
 
@@ -7,7 +7,7 @@
 
 import { Buffer } from 'node:buffer';
 
-declare namespace expressmax {
+declare namespace maxpress {
   interface ExpressMaxOptions {
     /** Initial buffer size for request/response handling (default: 16384) */
     initialBufferSize?: number;
@@ -132,7 +132,7 @@ declare namespace expressmax {
     backend: string;
   }
 
-  class expressmaxClass {
+  class maxpressClass {
     /** Module version */
     readonly version: string;
     /** Current platform (linux, macos, windows) */
@@ -140,7 +140,7 @@ declare namespace expressmax {
     /** Async I/O backend being used */
     readonly backend: string;
 
-    constructor(options?: expressmaxOptions);
+    constructor(options?: maxpressOptions);
 
     /**
      * Register middleware for all routes
@@ -222,19 +222,19 @@ declare namespace expressmax {
 }
 
 /**
- * Create expressmax application instance
+ * Create maxpress application instance
  * @param options Configuration options
- * @returns expressmax application instance
+ * @returns maxpress application instance
  */
-declare function expressmax(options?: expressmax.expressmaxOptions): expressmax.expressmaxClass;
+declare function maxpress(options?: maxpress.maxpressOptions): maxpress.maxpressClass;
 
-declare namespace expressmax {
+declare namespace maxpress {
   export const version: string;
   export const platform: string;
   export const backend: string;
-  export const expressmax: typeof expressmax.expressmaxClass;
-  export const Request: typeof expressmax.Request;
-  export const Response: typeof expressmax.Response;
+  export const maxpress: typeof maxpress.maxpressClass;
+  export const Request: typeof maxpress.Request;
+  export const Response: typeof maxpress.Response;
 }
 
-export = expressmax;
+export = maxpress;

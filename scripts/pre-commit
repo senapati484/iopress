@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Pre-commit hook for expressmax
+# Pre-commit hook for maxpress
 # Runs linting on staged files
 #
 

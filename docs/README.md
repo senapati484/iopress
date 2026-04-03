@@ -1,10 +1,10 @@
-# expressmax Documentation
+# maxpress Documentation
 
-Welcome to the expressmax documentation! Choose your path:
+Welcome to the maxpress documentation! Choose your path:
 
 ## Quick Start
 
-- [**Getting Started**](guides/getting-started.md) - Your first expressmax server in 5 minutes
+- [**Getting Started**](guides/getting-started.md) - Your first maxpress server in 5 minutes
 - [**Installation**](deployment/PREBUILT_BINARIES.md) - Installation options and prebuilt binaries
 
 ## Core Documentation
@@ -62,16 +62,16 @@ Welcome to the expressmax documentation! Choose your path:
 
 ## Quick Links
 
-- [GitHub Repository](https://github.com/senapati484/expressmax)
-- [npm Package](https://www.npmjs.com/package/expressmax)
-- [Issues & Bug Reports](https://github.com/senapati484/expressmax/issues)
-- [Discussions](https://github.com/senapati484/expressmax/discussions)
+- [GitHub Repository](https://github.com/senapati484/maxpress)
+- [npm Package](https://www.npmjs.com/package/maxpress)
+- [Issues & Bug Reports](https://github.com/senapati484/maxpress/issues)
+- [Discussions](https://github.com/senapati484/maxpress/discussions)
 
 ## Community
 
-- 💬 [Discord](https://discord.gg/expressmax)
+- 💬 [Discord](https://discord.gg/maxpress)
 - 🐦 [Twitter](https://twitter.com/express_pro)
-- 📧 [Email Support](mailto:support@expressmax.dev)
+- 📧 [Email Support](mailto:support@maxpress.dev)
 
 ---
 

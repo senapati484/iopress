@@ -1,5 +1,5 @@
 /**
- * expressmax HTTP Parser Header
+ * maxpress HTTP Parser Header
  *
  * @file parser.h
  */

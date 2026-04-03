@@ -28,22 +28,22 @@
 
 'use strict';
 
-const expressmax = require('../index.js');
+const maxpress = require('../index.js');
 
 // Create application
-const app = expressmax();
+const app = maxpress();
 
-console.log('ExpressMax v' + expressmax.version);
-console.log('Platform:', expressmax.platform);
-console.log('Backend:', expressmax.backend);
+console.log('ExpressMax v' + maxpress.version);
+console.log('Platform:', maxpress.platform);
+console.log('Backend:', maxpress.backend);
 
 // GET /
 app.get('/', (req, res) => {
   res.json({
     message: 'Hello from ExpressMax!',
     timestamp: Date.now(),
-    platform: expressmax.platform,
-    backend: expressmax.backend
+    platform: maxpress.platform,
+    backend: maxpress.backend
   });
 });
 
@@ -59,9 +59,9 @@ app.get('/health', (req, res) => {
 // GET /info - Server information
 app.get('/info', (req, res) => {
   res.json({
-    version: expressmax.version,
-    platform: expressmax.platform,
-    backend: expressmax.backend,
+    version: maxpress.version,
+    platform: maxpress.platform,
+    backend: maxpress.backend,
     nodeVersion: process.version
   });
 });

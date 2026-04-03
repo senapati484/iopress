@@ -1,4 +1,4 @@
-# Contributing to expressmax
+# Contributing to maxpress
 
 Thank you for your interest in contributing! This guide covers everything you need to know to contribute effectively.
 
@@ -63,8 +63,8 @@ choco install llvm
 
 ```bash
 # Fork and clone
-git clone https://github.com/YOUR_USERNAME/expressmax.git
-cd expressmax
+git clone https://github.com/YOUR_USERNAME/maxpress.git
+cd maxpress
 
 # Install dependencies
 npm ci
@@ -82,7 +82,7 @@ npm run lint
 ## Project Structure
 
 ```
-expressmax/
+maxpress/
 ├── src/                    # C source files
 │   ├── binding.c          # Node-API entry point
 │   ├── server.h           # Platform interface (implement this!)
@@ -534,7 +534,7 @@ git push --follow-tags origin main
 
 ## Questions?
 
-- **Discord**: [Join our community](https://discord.gg/expressmax)
+- **Discord**: [Join our community](https://discord.gg/maxpress)
 - **Issues**: [GitHub Issues](../../issues)
 - **Security**: See [SECURITY.md](./SECURITY.md)
 
@@ -544,4 +544,4 @@ This project follows the [Contributor Covenant Code of Conduct](https://www.cont
 
 ---
 
-**Thank you for contributing to expressmax!** 🚀
+**Thank you for contributing to maxpress!** 🚀
