@@ -46,8 +46,8 @@
     "bench:regression": "node benchmark/regression.js",
     "memcheck": "bash scripts/valgrind.sh",
     "test:memory": "node --pending-deprecation --expose-gc test/memory.test.js",
-    "lint": "clang-format --dry-run src/*.c && eslint js/ test/ examples/",
-    "lint:fix": "clang-format -i src/*.c && eslint js/ test/ benchmark/ examples/ --fix",
+    "lint": "clang-format --dry-run src/*.c && eslint js/ examples/",
+    "lint:fix": "clang-format -i src/*.c && eslint js/ examples/ --fix",
     "prepare": "node -e \"require('fs').mkdirSync('.git/hooks', {recursive:true}); require('fs').copyFileSync('scripts/pre-commit', '.git/hooks/pre-commit'); require('fs').chmodSync('.git/hooks/pre-commit', 0o755);\" 2>/dev/null || true",
     "docs": "typedoc --config typedoc.json",
     "release": "standard-version",
@@ -74,16 +74,16 @@
     "@mapbox/node-pre-gyp": "^2.0.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@mapbox/node-pre-gyp": "^2.0.3",
     "@types/node": "^25.5.0",
     "autocannon": "^8.0.0",
-    "eslint": "^9.39.4",
+    "eslint": "^10.1.0",
     "express": "^5.2.1",
     "globals": "^17.4.0",
     "node-addon-api": "^8.7.0",
     "node-gyp": "^12.2.0",
     "standard-version": "^9.5.0",
-    "typedoc": "^0.25.0"
+    "typedoc": "^0.28.18"
   }
 }

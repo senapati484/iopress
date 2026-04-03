@@ -116,7 +116,6 @@ app.post('/upload', (req, res) => {
   // const writeStream = fs.createWriteStream(filepath);
 
   // Track progress
-  let bytesReceived = 0;
   const startTime = Date.now();
 
   const uploadInfo = {
@@ -143,7 +142,7 @@ app.post('/upload', (req, res) => {
   // If we have raw body as buffer, write it
   if (req.rawBody) {
     fs.writeFileSync(filepath, req.rawBody);
-    bytesReceived = req.rawBody.length;
+    const bytesReceived = req.rawBody.length;
     uploadInfo.bytesReceived = bytesReceived;
     uploadInfo.status = 'completed';
     uploadInfo.duration = Date.now() - startTime;

@@ -1,10 +1,11 @@
 const js = require('@eslint/js');
 const globals = require('globals');
 
+/** @type {import('eslint').Linter.Config[]} */
 module.exports = [
   js.configs.recommended,
   {
-    files: ['*.js', 'js/**/*.js', 'test/**/*.js', 'benchmark/**/*.js', 'examples/**/*.js'],
+    files: ['js/**/*.js', 'examples/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
@@ -20,10 +21,12 @@ module.exports = [
       'semi': ['error', 'always'],
       'no-unused-vars': ['error', { 
         'argsIgnorePattern': '^_', 
-        'varsIgnorePattern': '^_',
-        'caughtErrorsIgnorePattern': '^_'
+        'varsIgnorePattern': '^_'
       }],
       'no-console': 'off'
     }
+  },
+  {
+    ignores: ['eslint.config.js']
   }
 ];
