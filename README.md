@@ -1,4 +1,4 @@
-# iopress
+# @iopress/core
 
 High-performance native HTTP server for Node.js with platform-specific async I/O. Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows) for maximum throughput with minimal latency.
 
@@ -30,7 +30,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ## Installation
 
 ```bash
-npm install iopress
+npm install @@iopress/core/core
 ```
 
 ### Platform Prerequisites
@@ -58,10 +58,10 @@ npm install iopress
 ## Quickstart
 
 ```javascript
-const iopress = require('iopress');
+const @iopress/core = require('@@iopress/core/core');
 
 // Create application instance
-const app = iopress();
+const app = @iopress/core();
 
 // Middleware support
 app.use((req, res, next) => {
@@ -102,18 +102,18 @@ app.listen(3000, () => {
 
 ## API Reference
 
-### iopress(options?)
+### @iopress/core(options?)
 
-Creates a new iopress application instance.
+Creates a new @iopress/core application instance.
 
 ```javascript
-const iopress = require('iopress');
+const @iopress/core = require('@iopress/core');
 
 // Default options
-const app = iopress();
+const app = @iopress/core();
 
 // With custom options
-const app = iopress({
+const app = @iopress/core({
   initialBufferSize: 32768,
   maxBodySize: 5242880,  // 5MB
   streamBody: false
@@ -347,11 +347,11 @@ res.end('Final chunk');
 ### Module Properties
 
 ```javascript
-const iopress = require('iopress');
+const @iopress/core = require('@iopress/core');
 
-console.log(iopress.version);   // '1.0.0'
-console.log(iopress.platform);  // 'linux', 'darwin', 'win32'
-console.log(iopress.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
+console.log(@iopress/core.version);   // '1.0.0'
+console.log(@iopress/core.platform);  // 'linux', 'darwin', 'win32'
+console.log(@iopress/core.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
 ```
 
 ## Configuration Options
@@ -371,7 +371,7 @@ Increase this value if:
 
 ```javascript
 // For APIs with large headers (JWT tokens, etc.)
-const app = iopress({
+const app = @iopress/core({
   initialBufferSize: 65536  // 64KB
 });
 ```
@@ -385,7 +385,7 @@ Increase this value if:
 
 ```javascript
 // For file upload server
-const app = iopress({
+const app = @iopress/core({
   maxBodySize: 50 * 1024 * 1024  // 50MB
 });
 ```
@@ -402,7 +402,7 @@ Enable streaming if:
 
 ```javascript
 // For streaming/proxy use cases
-const app = iopress({
+const app = @iopress/core({
   streamBody: true,
   maxBodySize: 100 * 1024 * 1024  // Still needed for max protection
 });
@@ -425,7 +425,7 @@ app.post('/upload', (req, res) => {
 
 ### Backend Auto-Detection
 
-iopress automatically selects the best available backend:
+@iopress/core automatically selects the best available backend:
 
 1. **Linux with kernel 5.1+**: Uses io_uring for maximum performance
 2. **macOS**: Uses kqueue for efficient event notification
@@ -435,13 +435,13 @@ iopress automatically selects the best available backend:
 ### Checking Your Backend
 
 ```javascript
-const app = iopress();
-console.log(iopress.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
+const app = @iopress/core();
+console.log(@iopress/core.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 ```
 
 ## Migrating from Express
 
-iopress is designed to be API-compatible with Express.js for common use cases.
+@iopress/core is designed to be API-compatible with Express.js for common use cases.
 
 ### What's Compatible
 
@@ -453,9 +453,9 @@ iopress is designed to be API-compatible with Express.js for common use cases.
 
 ### What's Different
 
-| Feature | Express.js | iopress |
+| Feature | Express.js | @iopress/core |
 |---------|-----------|-------------|
-| Create app | `const app = express()` | `const app = iopress()` |
+| Create app | `const app = express()` | `const app = @iopress/core()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
 | Static files | `express.static()` | Not included (use nginx/CDN) |
 | View engine | Built-in | Not included (API-focused) |
@@ -480,10 +480,10 @@ app.get('/api/users/:id', (req, res) => {
 app.listen(3000);
 ```
 
-**iopress:**
+**@iopress/core:**
 ```javascript
-const iopress = require('iopress');
-const app = iopress();
+const @iopress/core = require('@iopress/core');
+const app = @iopress/core();
 
 // No need for express.json() - body parsing is built-in
 
@@ -509,8 +509,8 @@ app.listen(3000);
 
 ```bash
 # Clone the repository
-git clone https://github.com/senapati484/iopress.git
-cd iopress
+git clone https://github.com/senapati484/@iopress/core.git
+cd @iopress/core
 
 # Install dependencies
 npm install
@@ -568,9 +568,9 @@ Results from AMD Ryzen 9 5900X, Node.js 20:
 
 | Server | Requests/sec | Latency (p99) |
 |--------|-------------|---------------|
-| iopress (io_uring) | 520,000 | 0.8ms |
-| iopress (kqueue) | 155,000 | 2.1ms |
-| iopress (IOCP) | 105,000 | 3.5ms |
+| @iopress/core (io_uring) | 520,000 | 0.8ms |
+| @iopress/core (kqueue) | 155,000 | 2.1ms |
+| @iopress/core (IOCP) | 105,000 | 3.5ms |
 | Node.js http | 45,000 | 8.2ms |
 | Express.js | 18,000 | 22ms |
 | Fastify | 65,000 | 5.1ms |
@@ -611,4 +611,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-**Made with performance in mind.** If you find iopress useful, please consider starring the repository on GitHub!
+**Made with performance in mind.** If you find @iopress/core useful, please consider starring the repository on GitHub!

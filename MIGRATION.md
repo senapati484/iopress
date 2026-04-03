@@ -8,7 +8,7 @@ This guide helps you migrate existing Express.js applications to iopress. Most a
 
 | Feature | Express.js | iopress | Action |
 |---------|-----------|-------------|--------|
-| Import | `require('express')` | `require('iopress')` | ✅ Replace |
+| Import | `require('express')` | `require('@iopress/core')` | ✅ Replace |
 | App creation | `express()` | `iopress()` | ⚠️  Update |
 | Route handlers | `app.get()` | `app.get()` | ✅ Same |
 | Middleware | `app.use()` | `app.use()` | ✅ Same |
@@ -47,7 +47,7 @@ const app = express();
 
 **After (iopress):**
 ```javascript
-const iopress = require('iopress');
+const iopress = require('@iopress/core');
 const app = iopress();
 ```
 
@@ -235,7 +235,7 @@ app.listen(3000, () => {
 ### After: iopress App
 
 ```javascript
-const iopress = require('iopress');
+const iopress = require('@iopress/core');
 const fs = require('fs');
 const path = require('path');
 

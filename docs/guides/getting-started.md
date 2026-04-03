@@ -1,6 +1,6 @@
-# Getting Started with iopress
+# Getting Started with @iopress/core
 
-Welcome to iopress! This guide will walk you through creating your first high-performance HTTP server using our native C++ HTTP engine.
+Welcome to @iopress/core! This guide will walk you through creating your first high-performance HTTP server using our native C++ HTTP engine.
 
 ## Table of Contents
 
@@ -27,15 +27,15 @@ Before you begin, ensure you have the following installed:
   - **macOS**: Install Xcode Command Line Tools (`xcode-select --install`)
   - **Windows**: Install Visual Studio Build Tools with "Desktop development with C++" workload
 
-### Install iopress
+### Install @iopress/core
 
-Create a new directory for your project and install iopress:
+Create a new directory for your project and install @iopress/core:
 
 ```bash
 mkdir my-first-server
 cd my-first-server
 npm init -y
-npm install iopress
+npm install @iopress/core
 ```
 
 **Note**: On Linux, you may need `liburing-dev` for optimal performance:
@@ -51,21 +51,21 @@ Create a file named `server.js` in your project directory:
 
 ```javascript
 // server.js
-const iopress = require('iopress');
+const @iopress/core = require('@iopress/core');
 
 // Create an application instance
-const app = iopress();
+const app = @iopress/core();
 
 // Define a route
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello from iopress!' });
+  res.json({ message: 'Hello from @iopress/core!' });
 });
 
 // Start the server
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${iopress.backend}`);
+  console.log(`Native backend: ${@iopress/core.backend}`);
 });
 ```
 
@@ -84,17 +84,17 @@ Native backend: kqueue  (or io_uring/iocp depending on your platform)
 Test it:
 ```bash
 curl http://localhost:3000/
-# Output: {"message":"Hello from iopress!"}
+# Output: {"message":"Hello from @iopress/core!"}
 ```
 
 ---
 
 ## Basic Routing
 
-iopress supports Express-style routing with HTTP methods:
+@iopress/core supports Express-style routing with HTTP methods:
 
 ```javascript
-const app = iopress();
+const app = @iopress/core();
 
 // GET request
 app.get('/users', (req, res) => {
@@ -214,7 +214,7 @@ app.post('/users', (req, res) => {
 Middleware functions execute before your route handlers:
 
 ```javascript
-const app = iopress();
+const app = @iopress/core();
 
 // Global middleware (runs on every request)
 app.use((req, res, next) => {
@@ -278,7 +278,7 @@ NODE_ENV=production node server.js
 Handle shutdown signals properly:
 
 ```javascript
-const app = iopress();
+const app = @iopress/core();
 const server = app.listen(3000, () => {
   console.log('Server started');
 });
@@ -324,9 +324,9 @@ Here's a complete REST API example:
 
 ```javascript
 // api-server.js
-const iopress = require('iopress');
+const @iopress/core = require('@iopress/core');
 
-const app = iopress();
+const app = @iopress/core();
 
 // In-memory "database"
 const users = [
@@ -342,7 +342,7 @@ app.use((req, res, next) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', backend: iopress.backend });
+  res.json({ status: 'ok', backend: @iopress/core.backend });
 });
 
 // Get all users
@@ -416,7 +416,7 @@ app.onError((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API Server running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${iopress.backend}`);
+  console.log(`Native backend: ${@iopress/core.backend}`);
 });
 ```
 
@@ -472,7 +472,7 @@ npm run build
 npm run configure && npm run build
 ```
 
-### "Cannot find module" for iopress
+### "Cannot find module" for @iopress/core
 
 ```bash
 # Ensure you're in the correct directory
@@ -507,4 +507,4 @@ app.listen(3001);  # Use port 3001 instead
 
 **Happy Coding!** 🚀
 
-For more information, visit our [GitHub Repository](https://github.com/senapati484/iopress).
+For more information, visit our [GitHub Repository](https://github.com/senapati484/@iopress/core).

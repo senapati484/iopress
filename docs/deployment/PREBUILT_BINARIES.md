@@ -137,7 +137,7 @@ npm init -y
 npm install iopress --build-from-source=false
 
 # Test
-node -e "const app = require('iopress')(); console.log('✓ Installed successfully');"
+node -e "const app = require('@iopress/core')(); console.log('✓ Installed successfully');"
 ```
 
 ## For Package Maintainers

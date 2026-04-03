@@ -10,7 +10,7 @@
  * @author senapati484
  *
  * @example
- * const iopress = require('iopress');
+ * const iopress = require('@iopress/core');
  * const app = iopress();
  *
  * app.get('/hello', (req, res) => {
@@ -424,7 +424,7 @@ class iopress {
  *              to deliver 8x+ performance compared to Express.js.
  *
  * @example
- * const iopress = require('iopress');
+ * const iopress = require('@iopress/core');
  * const app = iopress();
  *
  * app.get('/', (req, res) => res.json({ message: 'Hello, World!' }));
@@ -856,7 +856,7 @@ class iopress {
  * @since 1.0.0
  *
  * @example
- * const iopress = require('iopress');
+ * const iopress = require('@iopress/core');
  * const app = iopress();
  *
  * app.get('/', (req, res) => {

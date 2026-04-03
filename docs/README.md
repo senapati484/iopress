@@ -63,7 +63,7 @@ Welcome to the iopress documentation! Choose your path:
 ## Quick Links
 
 - [GitHub Repository](https://github.com/senapati484/iopress)
-- [npm Package](https://www.npmjs.com/package/iopress)
+- [npm Package](https://www.npmjs.com/package/@iopress/core)
 - [Issues & Bug Reports](https://github.com/senapati484/iopress/issues)
 - [Discussions](https://github.com/senapati484/iopress/discussions)
 

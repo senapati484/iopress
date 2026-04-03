@@ -159,7 +159,7 @@ wrk -t4 -c400 -d30s http://your-api/endpoint
 
 ```javascript
 // server.js
-const iopress = require('iopress');
+const iopress = require('@iopress/core');
 const app = iopress();
 
 // Your routes here
