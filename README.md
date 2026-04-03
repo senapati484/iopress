@@ -30,7 +30,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ## Installation
 
 ```bash
-npm install @@iopress/core/core
+npm install @iopress/core
 ```
 
 ### Platform Prerequisites
@@ -58,10 +58,10 @@ npm install @@iopress/core/core
 ## Quickstart
 
 ```javascript
-const @iopress/core = require('@@iopress/core/core');
+const iopress = require('@iopress/core');
 
 // Create application instance
-const app = @iopress/core();
+const app = iopress();
 
 // Middleware support
 app.use((req, res, next) => {
@@ -107,13 +107,13 @@ app.listen(3000, () => {
 Creates a new @iopress/core application instance.
 
 ```javascript
-const @iopress/core = require('@iopress/core');
+const iopress = require('@iopress/core');
 
 // Default options
-const app = @iopress/core();
+const app = iopress();
 
 // With custom options
-const app = @iopress/core({
+const app = iopress({
   initialBufferSize: 32768,
   maxBodySize: 5242880,  // 5MB
   streamBody: false
@@ -347,11 +347,11 @@ res.end('Final chunk');
 ### Module Properties
 
 ```javascript
-const @iopress/core = require('@iopress/core');
+const iopress = require('@iopress/core');
 
-console.log(@iopress/core.version);   // '1.0.0'
-console.log(@iopress/core.platform);  // 'linux', 'darwin', 'win32'
-console.log(@iopress/core.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
+console.log(iopress.version);   // '1.0.0'
+console.log(iopress.platform);  // 'linux', 'darwin', 'win32'
+console.log(iopress.backend);   // 'io_uring', 'kqueue', 'iocp', 'libuv'
 ```
 
 ## Configuration Options
@@ -371,7 +371,7 @@ Increase this value if:
 
 ```javascript
 // For APIs with large headers (JWT tokens, etc.)
-const app = @iopress/core({
+const app = iopress({
   initialBufferSize: 65536  // 64KB
 });
 ```
@@ -385,7 +385,7 @@ Increase this value if:
 
 ```javascript
 // For file upload server
-const app = @iopress/core({
+const app = iopress({
   maxBodySize: 50 * 1024 * 1024  // 50MB
 });
 ```
@@ -402,7 +402,7 @@ Enable streaming if:
 
 ```javascript
 // For streaming/proxy use cases
-const app = @iopress/core({
+const app = iopress({
   streamBody: true,
   maxBodySize: 100 * 1024 * 1024  // Still needed for max protection
 });
@@ -435,8 +435,8 @@ app.post('/upload', (req, res) => {
 ### Checking Your Backend
 
 ```javascript
-const app = @iopress/core();
-console.log(@iopress/core.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
+const app = iopress();
+console.log(iopress.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 ```
 
 ## Migrating from Express
@@ -455,7 +455,7 @@ console.log(@iopress/core.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 
 | Feature | Express.js | @iopress/core |
 |---------|-----------|-------------|
-| Create app | `const app = express()` | `const app = @iopress/core()` |
+| Create app | `const app = express()` | `const app = iopress()` |
 | Body parsing | Built-in middleware | Built-in (auto-parsed) |
 | Static files | `express.static()` | Not included (use nginx/CDN) |
 | View engine | Built-in | Not included (API-focused) |
@@ -482,8 +482,8 @@ app.listen(3000);
 
 **@iopress/core:**
 ```javascript
-const @iopress/core = require('@iopress/core');
-const app = @iopress/core();
+const iopress = require('@iopress/core');
+const app = iopress();
 
 // No need for express.json() - body parsing is built-in
 

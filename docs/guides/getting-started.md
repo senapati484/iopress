@@ -51,10 +51,10 @@ Create a file named `server.js` in your project directory:
 
 ```javascript
 // server.js
-const @iopress/core = require('@iopress/core');
+const iopress = require('@iopress/core');
 
 // Create an application instance
-const app = @iopress/core();
+const app = iopress();
 
 // Define a route
 app.get('/', (req, res) => {
@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${@iopress/core.backend}`);
+  console.log(`Native backend: ${iopress.backend}`);
 });
 ```
 
@@ -94,7 +94,7 @@ curl http://localhost:3000/
 @iopress/core supports Express-style routing with HTTP methods:
 
 ```javascript
-const app = @iopress/core();
+const app = iopress();
 
 // GET request
 app.get('/users', (req, res) => {
@@ -214,7 +214,7 @@ app.post('/users', (req, res) => {
 Middleware functions execute before your route handlers:
 
 ```javascript
-const app = @iopress/core();
+const app = iopress();
 
 // Global middleware (runs on every request)
 app.use((req, res, next) => {
@@ -278,7 +278,7 @@ NODE_ENV=production node server.js
 Handle shutdown signals properly:
 
 ```javascript
-const app = @iopress/core();
+const app = iopress();
 const server = app.listen(3000, () => {
   console.log('Server started');
 });
@@ -324,9 +324,9 @@ Here's a complete REST API example:
 
 ```javascript
 // api-server.js
-const @iopress/core = require('@iopress/core');
+const iopress = require('@iopress/core');
 
-const app = @iopress/core();
+const app = iopress();
 
 // In-memory "database"
 const users = [
@@ -342,7 +342,7 @@ app.use((req, res, next) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', backend: @iopress/core.backend });
+  res.json({ status: 'ok', backend: iopress.backend });
 });
 
 // Get all users
@@ -416,7 +416,7 @@ app.onError((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API Server running on http://localhost:${PORT}`);
-  console.log(`Native backend: ${@iopress/core.backend}`);
+  console.log(`Native backend: ${iopress.backend}`);
 });
 ```
 
