@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [main, master]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -35,42 +31,8 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install clang-format || true
-
-      - name: Install system dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install llvm --version=17.0.6 --no-progress || true
-        shell: pwsh
-
-      - name: Cache node-gyp and build artifacts
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.node-gyp
-            ~/.npm/_prebuilds
-            build/
-          key: ${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json', '**/binding.gyp') }}
-          restore-keys: |
-            ${{ runner.os }}-node${{ matrix.node-version }}-
-            ${{ runner.os }}-
-
       - name: Install npm dependencies
         run: npm ci
-
-      - name: Run linter
-        if: runner.os != 'Windows'
-        run: npm run lint
-        continue-on-error: true
 
       - name: Build native addon
         run: npm run build
@@ -82,13 +44,3 @@ jobs:
         if: runner.os != 'Windows'
         run: npm run bench:ci
         timeout-minutes: 2
-
-      - name: Upload build artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-${{ matrix.platform }}-node${{ matrix.node-version }}
-          path: |
-            build/
-            npm-debug.log
-            yarn-error.log
