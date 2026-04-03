@@ -1,5 +1,5 @@
 /**
- * Deprecation warning utilities for iopress
+ * Deprecation warning utilities for norvex
  * @module deprecation
  */
 

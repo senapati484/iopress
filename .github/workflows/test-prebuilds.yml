@@ -32,30 +32,30 @@ jobs:
         env:
           npm_config_build_from_source: "false"
         run: |
-          npm install iopress@${{ github.event.inputs.version }} --save-exact
+          npm install norvex@${{ github.event.inputs.version }} --save-exact
         continue-on-error: true
 
       - name: Test if binary was downloaded
         run: |
-          if [ -f "node_modules/iopress/build/Release/express_pro_native.node" ]; then
+          if [ -f "node_modules/norvex/build/Release/express_pro_native.node" ]; then
             echo "✓ Prebuilt binary found"
-            ls -la node_modules/iopress/build/Release/
-            file node_modules/iopress/build/Release/express_pro_native.node
+            ls -la node_modules/norvex/build/Release/
+            file node_modules/norvex/build/Release/express_pro_native.node
           else
             echo "✗ Prebuilt binary not found - fallback to build likely occurred"
-            ls -la node_modules/iopress/
+            ls -la node_modules/norvex/
             exit 1
           fi
 
       - name: Test module loading
         run: |
           node -e "
-            const iopress = require('./node_modules/iopress');
+            const norvex = require('./node_modules/norvex');
             console.log('Module loaded successfully');
-            console.log('Backend:', iopress.backend);
-            console.log('Version:', iopress.version);
+            console.log('Backend:', norvex.backend);
+            console.log('Version:', norvex.version);
 
-            const app = iopress();
+            const app = norvex();
             app.get('/health', (req, res) => res.json({status: 'ok'}));
 
             const server = app.listen(0, () => {
@@ -86,4 +86,4 @@ jobs:
           ldd --version
           echo ""
           echo "Binary dependencies:"
-          ldd node_modules/iopress/build/Release/express_pro_native.node || true
+          ldd node_modules/norvex/build/Release/express_pro_native.node || true

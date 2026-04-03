@@ -2,7 +2,7 @@
 
 ## Overview
 
-iopress provides prebuilt binaries for major platforms, eliminating the need for users to install build tools (Python, C++ compiler, etc.).
+norvex provides prebuilt binaries for major platforms, eliminating the need for users to install build tools (Python, C++ compiler, etc.).
 
 ## Supported Platforms
 
@@ -17,7 +17,7 @@ iopress provides prebuilt binaries for major platforms, eliminating the need for
 ### Standard Installation (Recommended)
 
 ```bash
-npm install iopress
+npm install norvex
 ```
 
 This will:
@@ -27,13 +27,13 @@ This will:
 ### Force Prebuilt Binary (Fail if not available)
 
 ```bash
-npm install iopress --build-from-source=false
+npm install norvex --build-from-source=false
 ```
 
 ### Force Compile from Source
 
 ```bash
-npm install iopress --build-from-source
+npm install norvex --build-from-source
 ```
 
 ## Binary Naming Convention
@@ -68,8 +68,8 @@ Error: Cannot find module './build/Release/express_pro_native'
 ```
 
 **Solution:**
-1. Check if binary exists: `ls node_modules/iopress/build/Release/`
-2. If missing, reinstall: `npm install iopress --build-from-source`
+1. Check if binary exists: `ls node_modules/norvex/build/Release/`
+2. If missing, reinstall: `npm install norvex --build-from-source`
 
 ### "GLIBC version not found" (Linux)
 
@@ -87,7 +87,7 @@ ldd --version
 **If your glibc is too old:**
 ```bash
 # Compile from source instead
-npm install iopress --build-from-source
+npm install norvex --build-from-source
 ```
 
 ### "Invalid ELF header" (Linux)
@@ -102,10 +102,10 @@ uname -m
 **Solution:**
 ```bash
 # Remove cached binary
-rm -rf node_modules/iopress
+rm -rf node_modules/norvex
 
 # Reinstall with correct arch
-npm install iopress
+npm install norvex
 ```
 
 ### Windows: "The specified module could not be found"
@@ -134,10 +134,10 @@ cd test-install
 npm init -y
 
 # Install without build tools
-npm install iopress --build-from-source=false
+npm install norvex --build-from-source=false
 
 # Test
-node -e "const app = require('iopress')(); console.log('✓ Installed successfully');"
+node -e "const app = require('norvex')(); console.log('✓ Installed successfully');"
 ```
 
 ## For Package Maintainers
@@ -208,10 +208,10 @@ Verify binary authenticity:
 
 ```bash
 # Check binary was downloaded (not built locally)
-ls -la node_modules/iopress/build/stage/
+ls -la node_modules/norvex/build/stage/
 
 # Verify checksum (if available)
-cat node_modules/iopress/build/stage/*.tar.gz.sha256
+cat node_modules/norvex/build/stage/*.tar.gz.sha256
 ```
 
 ## Fallback Behavior
@@ -237,7 +237,7 @@ To disable fallback:
 
 - Requires glibc 2.28+ (Ubuntu 18.04+, Debian 10+, RHEL 8+)
 - Alpine Linux uses musl (not supported by prebuilt binaries)
-- For Alpine, use: `npm install iopress --build-from-source`
+- For Alpine, use: `npm install norvex --build-from-source`
 
 ### macOS
 
@@ -255,10 +255,10 @@ To disable fallback:
 
 If prebuilt binaries don't work:
 
-1. Check [GitHub Releases](https://github.com/senapati484/iopress/releases) for your platform
+1. Check [GitHub Releases](https://github.com/senapati484/norvex/releases) for your platform
 2. Run `npm run test:prebuilds` for diagnostics
 3. Open an issue with:
    - Platform: `uname -a`
    - Node version: `node --version`
    - npm version: `npm --version`
-   - Error log: `npm install iopress --verbose`
+   - Error log: `npm install norvex --verbose`

@@ -5,13 +5,13 @@
 
 #include "common.h"
 
-namespace iopress {
+namespace norvex {
   class Server {
   public:
     static const char* GetBackendName();
     static Napi::Value CreateServer(const Napi::CallbackInfo& info);
   };
 
-}  // namespace iopress
+}  // namespace norvex
 
 #endif  // EXPRESS_PRO_SERVER_H_

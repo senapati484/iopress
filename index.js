@@ -13,6 +13,6 @@ if (existsSync(buildPath + '.node')) {
   );
 }
 
-const iopress = require('./js/index.js');
+const norvex = require('./js/index.js');
 
-module.exports = iopress;
+module.exports = norvex;

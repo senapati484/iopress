@@ -94,7 +94,7 @@ function checkPackageConfig() {
 
 async function checkGitHubReleases(pkg) {
   const version = pkg.version;
-  const repoUrl = pkg.binary?.host_path || 'https://github.com/senapati484/iopress';
+  const repoUrl = pkg.binary?.host_path || 'https://github.com/senapati484/norvex';
 
   log('\nGitHub Releases Check:', 'blue');
   log(`  Expected version: v${version}`);
@@ -115,11 +115,11 @@ function testBinaryLoad() {
 
   try {
     // Try to require the module
-    const iopress = require('../index.js');
+    const norvex = require('../index.js');
     log('✓ Module loaded successfully', 'green');
 
     // Check exports
-    if (typeof iopress === 'function') {
+    if (typeof norvex === 'function') {
       log('✓ Main export is function', 'green');
     }
 
@@ -165,7 +165,7 @@ function generateReport() {
   log('  2. Push a tag to trigger release workflow');
   log('  3. Verify binaries appear in GitHub Releases');
   log('  4. Test on clean VM without build tools:');
-  log('     npm install iopress --build-from-source=false');
+  log('     npm install norvex --build-from-source=false');
   log('');
 }
 

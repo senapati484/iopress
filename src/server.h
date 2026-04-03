@@ -1,5 +1,5 @@
 /**
- * iopress Server Interface
+ * norvex Server Interface
  *
  * Platform-agnostic C interface that all 4 backend implementations
  * (io_uring, kqueue, IOCP, libuv) must conform to.

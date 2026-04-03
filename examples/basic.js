@@ -1,8 +1,8 @@
 /**
- * Basic Example - iopress Hello World
+ * Basic Example - norvex Hello World
  *
  * Demonstrates:
- * - Creating an iopress application
+ * - Creating an norvex application
  * - Simple GET and POST routes
  * - JSON response handling
  * - Starting the server
@@ -28,22 +28,22 @@
 
 'use strict';
 
-const iopress = require('../index.js');
+const norvex = require('../index.js');
 
 // Create application
-const app = iopress();
+const app = norvex();
 
-console.log('iopress v' + iopress.version);
-console.log('Platform:', iopress.platform);
-console.log('Backend:', iopress.backend);
+console.log('norvex v' + norvex.version);
+console.log('Platform:', norvex.platform);
+console.log('Backend:', norvex.backend);
 
 // GET /
 app.get('/', (req, res) => {
   res.json({
-    message: 'Hello from iopress!',
+    message: 'Hello from norvex!',
     timestamp: Date.now(),
-    platform: iopress.platform,
-    backend: iopress.backend
+    platform: norvex.platform,
+    backend: norvex.backend
   });
 });
 
@@ -59,9 +59,9 @@ app.get('/health', (req, res) => {
 // GET /info - Server information
 app.get('/info', (req, res) => {
   res.json({
-    version: iopress.version,
-    platform: iopress.platform,
-    backend: iopress.backend,
+    version: norvex.version,
+    platform: norvex.platform,
+    backend: norvex.backend,
     nodeVersion: process.version
   });
 });

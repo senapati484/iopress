@@ -39,9 +39,9 @@
 
 'use strict';
 
-const iopress = require('../index.js');
+const norvex = require('../index.js');
 
-const app = iopress();
+const app = norvex();
 
 // Store for request IDs
 const requestStore = new Map();

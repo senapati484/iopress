@@ -1,5 +1,5 @@
 /**
- * iopress Memory Leak Tests
+ * norvex Memory Leak Tests
  *
  * Tests for memory stability under load.
  *
@@ -11,7 +11,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
-const iopress = require('../js/index.js');
+const norvex = require('../js/index.js');
 
 const TEST_PORT = 3462;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -48,7 +48,7 @@ describe('Memory Leak Tests', () => {
   let server;
 
   before(async () => {
-    app = iopress();
+    app = norvex();
 
     // Various endpoints for testing
     app.get('/health', (req, res) => {

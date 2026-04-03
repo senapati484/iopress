@@ -1,5 +1,5 @@
 /**
- * iopress io_uring Backend (Linux)
+ * norvex io_uring Backend (Linux)
  *
  * High-performance Linux backend using io_uring for async I/O.
  *

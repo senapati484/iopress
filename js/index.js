@@ -1,17 +1,17 @@
 /**
- * iopress JavaScript API
+ * norvex JavaScript API
  *
  * High-performance native HTTP server with Express-compatible API.
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
- * @module iopress
+ * @module norvex
  * @version 1.0.0
  * @license ISC
  * @author senapati484
  *
  * @example
- * const iopress = require('iopress');
- * const app = iopress();
+ * const norvex = require('norvex');
+ * const app = norvex();
  *
  * app.get('/hello', (req, res) => {
  *   res.json({ message: 'Hello World' });
@@ -384,16 +384,16 @@ class Response {
 }
 
 /**
- * iopress Application Class.
+ * norvex Application Class.
  *
  * Main application class for creating HTTP servers with Express-compatible API.
  * Supports middleware, routing, error handling, and method chaining.
  *
- * @class iopress
+ * @class norvex
  * @since 1.0.0
  *
  * @example
- * const app = iopress();
+ * const app = norvex();
  *
  * // Middleware
  * app.use((req, res, next) => {
@@ -414,18 +414,18 @@ class Response {
  * // Start server
  * app.listen(3000);
  */
-class IOpress {
+class norvex {
 /**
- * iopress - High-Performance Native HTTP Server
+ * norvex - High-Performance Native HTTP Server
  *
- * @module iopress
+ * @module norvex
  * @description A blazing fast native HTTP server that uses platform-specific
  *              async I/O backends (io_uring on Linux, kqueue on macOS, IOCP on Windows)
  *              to deliver 8x+ performance compared to Express.js.
  *
  * @example
- * const iopress = require('iopress');
- * const app = iopress();
+ * const norvex = require('norvex');
+ * const app = norvex();
  *
  * app.get('/', (req, res) => res.json({ message: 'Hello, World!' }));
  * app.listen(3000);
@@ -445,7 +445,7 @@ class IOpress {
    *
    * @param {string|Function} path - Path pattern or middleware function
    * @param {...Function} handlers - Middleware handler functions
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -482,7 +482,7 @@ class IOpress {
    *
    * @param {string} path - Route pattern (e.g., '/users/:id')
    * @param {...Function} handlers - Route handler functions
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -505,7 +505,7 @@ class IOpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -524,7 +524,7 @@ class IOpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -543,7 +543,7 @@ class IOpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -562,7 +562,7 @@ class IOpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -583,7 +583,7 @@ class IOpress {
    * send an error response.
    *
    * @param {Function} handler - Error handler function (err, req, res, next)
-   * @returns {iopress} Returns this for method chaining
+   * @returns {norvex} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -846,18 +846,18 @@ class IOpress {
 }
 
 /**
- * Factory function to create an iopress application.
+ * Factory function to create an norvex application.
  *
- * Creates and returns a new iopress application instance.
+ * Creates and returns a new norvex application instance.
  * This is the default export and recommended way to create apps.
  *
- * @function iopress
- * @returns {iopress} New iopress application instance
+ * @function norvex
+ * @returns {norvex} New norvex application instance
  * @since 1.0.0
  *
  * @example
- * const iopress = require('iopress');
- * const app = iopress();
+ * const norvex = require('norvex');
+ * const app = norvex();
  *
  * app.get('/', (req, res) => {
  *   res.json({ hello: 'world' });
@@ -865,8 +865,8 @@ class IOpress {
  *
  * app.listen(3000);
  */
-function createIOpress() {
-  return new IOpress();
+function createnorvex() {
+  return new norvex();
 }
 
 /**
@@ -875,7 +875,7 @@ function createIOpress() {
  * @since 1.0.0
  * @static
  */
-createIOpress.version = native.version;
+createnorvex.version = native.version;
 
 /**
  * Current platform identifier.
@@ -883,7 +883,7 @@ createIOpress.version = native.version;
  * @since 1.0.0
  * @static
  */
-createIOpress.platform = native.platform;
+createnorvex.platform = native.platform;
 
 /**
  * Async I/O backend being used.
@@ -897,14 +897,14 @@ createIOpress.platform = native.platform;
  * @since 1.0.0
  * @static
  */
-createIOpress.backend = native.backend;
+createnorvex.backend = native.backend;
 
 /**
- * Alias to the IOpress class.
- * @type {typeof IOpress}
+ * Alias to the norvex class.
+ * @type {typeof norvex}
  * @static
  */
-createIOpress.IOpress = IOpress;
+createnorvex.norvex = norvex;
 
 /**
  * Request Class.
@@ -913,7 +913,7 @@ createIOpress.IOpress = IOpress;
  * @since 1.0.0
  * @static
  */
-createIOpress.Request = Request;
+createnorvex.Request = Request;
 
 /**
  * Response Class.
@@ -922,7 +922,7 @@ createIOpress.Request = Request;
  * @since 1.0.0
  * @static
  */
-createIOpress.Response = Response;
+createnorvex.Response = Response;
 
 // Export module
-module.exports = createIOpress;
+module.exports = createnorvex;

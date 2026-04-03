@@ -42,9 +42,9 @@
 
 'use strict';
 
-const iopress = require('../index.js');
+const norvex = require('../index.js');
 
-const app = iopress();
+const app = norvex();
 
 // In-memory data store
 const users = new Map();

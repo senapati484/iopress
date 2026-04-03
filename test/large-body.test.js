@@ -1,5 +1,5 @@
 /**
- * iopress Large Body Tests
+ * norvex Large Body Tests
  *
  * Tests for maxBodySize handling and body buffering.
  *
@@ -10,7 +10,7 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const iopress = require('../js/index.js');
+const norvex = require('../js/index.js');
 
 const TEST_PORT = 3460;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
@@ -20,7 +20,7 @@ describe('Large Body Tests', () => {
   let server;
 
   before(async () => {
-    app = iopress();
+    app = norvex();
 
     // Echo endpoint
     app.post('/echo', (req, res) => {

@@ -1,5 +1,5 @@
 /**
- * iopress Parser Unit Tests
+ * norvex Parser Unit Tests
  *
  * Standalone C test suite for parser.c
  *
@@ -490,7 +490,7 @@ void test_partial_headers(void) {
  */
 int main(void) {
   printf("============================================================\n");
-  printf("  iopress Parser Unit Tests\n");
+  printf("  norvex Parser Unit Tests\n");
   printf("============================================================\n\n");
 
   /* Run all tests */

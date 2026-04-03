@@ -1,5 +1,5 @@
 /**
- * iopress Router Unit Tests
+ * norvex Router Unit Tests
  *
  * Standalone C test suite for router.c
  *
@@ -503,7 +503,7 @@ void test_empty_router(void) {
  */
 int main(void) {
   printf("============================================================\n");
-  printf("  iopress Router Unit Tests\n");
+  printf("  norvex Router Unit Tests\n");
   printf("============================================================\n\n");
 
   /* Run all tests */

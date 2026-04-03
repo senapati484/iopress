@@ -51,8 +51,8 @@ native.RegisterFastRoute('GET', '/health', 200, '{"status":"ok"}');
 |--------|-------|----------|
 | Express.js | ~15,000 | 1x |
 | Fastify | ~70,000 | 4.7x |
-| iopress (JS routes) | ~86,000 | 5.7x |
-| iopress (fast routes) | ~150,000+ | 10x+ |
+| norvex (JS routes) | ~86,000 | 5.7x |
+| norvex (fast routes) | ~150,000+ | 10x+ |
 | Raw Node.js HTTP | ~40,000 | 2.7x |
 
 ## Achieving 300k+ Req/s

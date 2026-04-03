@@ -1,5 +1,5 @@
 /**
- * iopress Benchmark Regression Test
+ * norvex Benchmark Regression Test
  *
  * Automated performance testing with autocannon.
  * Fails CI if req/s drops below platform-specific thresholds.
@@ -10,7 +10,7 @@
 'use strict';
 
 const http = require('http');
-const iopress = require('../js/index.js');
+const norvex = require('../js/index.js');
 
 // Platform detection
 const platform = process.platform;
@@ -196,7 +196,7 @@ async function main() {
 
   // Create app and start server
   log('Starting server...', 'blue');
-  const app = iopress();
+  const app = norvex();
 
   // Try to register fast route for /health (bypasses JavaScript entirely)
   const native = require('../build/Release/express_pro_native');

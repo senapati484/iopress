@@ -1,4 +1,4 @@
-# Contributing to iopress
+# Contributing to norvex
 
 Thank you for your interest in contributing! This guide covers everything you need to know to contribute effectively.
 
@@ -63,8 +63,8 @@ choco install llvm
 
 ```bash
 # Fork and clone
-git clone https://github.com/senapati484/iopress.git
-cd iopress
+git clone https://github.com/senapati484/norvex.git
+cd norvex
 
 # Install dependencies
 npm ci
@@ -82,7 +82,7 @@ npm run lint
 ## Project Structure
 
 ```
-iopress/
+norvex/
 ├── src/                    # C source files
 │   ├── binding.c          # Node-API entry point
 │   ├── server.h           # Platform interface (implement this!)
@@ -342,7 +342,7 @@ static int process_http_request(client_t *client) {
  * Creates a new Application instance
  * @param {Object} [options] - Configuration options
  * @param {number} [options.maxBodySize=1048576] - Maximum body size in bytes
- * @returns {Application} iopress application instance
+ * @returns {Application} norvex application instance
  */
 function createApplication(options = {}) {
     'use strict';
@@ -534,7 +534,7 @@ git push --follow-tags origin main
 
 ## Questions?
 
-- **Discord**: [Join our community](https://discord.gg/iopress)
+- **Discord**: [Join our community](https://discord.gg/norvex)
 - **Issues**: [GitHub Issues](../../issues)
 - **Security**: See [SECURITY.md](./SECURITY.md)
 
@@ -544,4 +544,4 @@ This project follows the [Contributor Covenant Code of Conduct](https://www.cont
 
 ---
 
-**Thank you for contributing to iopress!** 🚀
+**Thank you for contributing to norvex!** 🚀

@@ -1,5 +1,5 @@
 /**
- * iopress HTTP Parser Test Suite
+ * norvex HTTP Parser Test Suite
  *
  * Standalone test binary for the HTTP/1.1 request parser.
  *
@@ -437,7 +437,7 @@ void test_append_body(void) {
  */
 
 int main(void) {
-  printf("\033[1miopress HTTP Parser Test Suite\033[0m\n");
+  printf("\033[1mnorvex HTTP Parser Test Suite\033[0m\n");
   printf("====================================\n\n");
 
   test_basic_get();
