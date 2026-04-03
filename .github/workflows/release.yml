@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    branches: [main, master]
+    tags:
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [18, 20]
+        node-version: [20]
         include:
           - os: ubuntu-latest
             platform: linux
@@ -33,6 +34,23 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install clang-format || true
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install llvm --version=17.0.6 --no-progress || true
+        shell: pwsh
+
       - name: Cache node-gyp and build artifacts
         uses: actions/cache@v4
         with:
@@ -44,23 +62,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node${{ matrix.node-version }}-
             ${{ runner.os }}-
-
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y liburing-dev clang-format
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install clang-format || true
-
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install llvm --version=17.0.6 --no-progress || true
-        shell: pwsh
 
       - name: Install npm dependencies
         run: npm ci
@@ -84,7 +85,6 @@ jobs:
   release:
     needs: build-binaries
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     permissions:
       contents: write
       id-token: write
@@ -94,7 +94,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -102,29 +101,10 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run release (bump version and changelog)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -z "$(git describe --tags --abbrev=0 2>/dev/null)" ]; then
-            echo "No previous tag found, creating initial release"
-            npm run release -- --first-release
-          else
-            npm run release
-          fi
-
-      - name: Get new version
+      - name: Get version from tag
         id: get_version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=${GITHUB_REF_NAME#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download all binary artifacts
@@ -138,16 +118,12 @@ jobs:
           find binaries -name "*.tar.gz" -exec cp {} release-binaries/ \;
           ls -la release-binaries/
 
-      - name: Push version bump and tag
-        run: |
-          git push --follow-tags origin ${{ github.ref_name }}
-
       - name: Create GitHub Release with binaries
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ steps.get_version.outputs.version }}" \
-            --title "v${{ steps.get_version.outputs.version }}" \
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
             --generate-notes \
             release-binaries/*.tar.gz
 

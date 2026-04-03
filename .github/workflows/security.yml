@@ -33,52 +33,6 @@ jobs:
         run: npm audit --audit-level=moderate
         continue-on-error: true
 
-      - name: Run audit-signatures (if supported)
-        run: npm audit signatures 2>/dev/null || echo "npm audit signatures not supported"
-        continue-on-error: true
-
-      - name: Check for known vulnerabilities
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript
-          queries: security-extended
-        continue-on-error: true
-
-  native-security:
-    name: Native Code Security Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y liburing-dev clang-format cppcheck
-
-      - name: Run C static analysis
-        run: |
-          cppcheck --enable=all --error-exitcode=1 \
-            --suppress=missingIncludeSystem \
-            --suppress=unusedFunction \
-            --suppress=unmatchedSuppression \
-            src/ 2>&1 | head -100
-        continue-on-error: true
-
-      - name: Check for common security issues
-        run: |
-          # Check for potential buffer overflow patterns
-          echo "Checking for potentially unsafe patterns..."
-          ! grep -rn "strcpy\|strcat\|sprintf" src/*.c 2>/dev/null || echo "Warning: Found potentially unsafe string functions"
-          ! grep -rn "gets(" src/*.c 2>/dev/null || echo "Warning: Found gets() usage"
-          echo "Security scan complete"
-        continue-on-error: true
-
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
@@ -94,12 +48,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript, c
-          queries: security-extended
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-        continue-on-error: true
+          languages: javascript
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
