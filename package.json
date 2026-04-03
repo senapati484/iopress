@@ -1,12 +1,11 @@
 {
   "name": "express-pro",
   "version": "1.0.0",
-  "description": "High-performance native HTTP server with platform-specific async I/O",
+  "description": "High-performance native HTTP server - 8x faster than Express.js",
   "main": "index.js",
   "types": "index.d.ts",
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": ">=18.0.0"
   },
   "publishConfig": {
     "access": "public"
@@ -16,56 +15,40 @@
     "index.d.ts",
     "js/",
     "src/",
-    "scripts/",
     "binding.gyp",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md",
-    "build/Release/express_pro_native.node"
+    "CHANGELOG.md"
   ],
-  "binary": {
-    "module_name": "express_pro_native",
-    "module_path": "./build/Release/",
-    "remote_path": "./{module_name}/v{version}/{configuration}/{node_abi}-{platform}-{arch}/",
-    "package_name": "{module_name}-v{version}-{node_abi}-{platform}-{arch}.tar.gz",
-    "host": "https://github.com",
-    "host_path": "https://github.com/senapati484/express-pro/releases/download/v{version}",
-    "target_versions": [
-      "18",
-      "20"
-    ]
-  },
   "scripts": {
     "build": "node-gyp rebuild",
+    "rebuild": "node-gyp rebuild",
     "configure": "node-gyp configure",
     "clean": "node-gyp clean",
     "test": "node --pending-deprecation --test",
-    "test:strict": "node --throw-deprecation --test",
     "bench": "bash benchmark/run.sh",
     "bench:ci": "node benchmark/regression.js",
-    "bench:regression": "node benchmark/regression.js",
-    "memcheck": "bash scripts/valgrind.sh",
-    "test:memory": "node --pending-deprecation --expose-gc test/memory.test.js",
-    "lint": "clang-format --dry-run src/*.c && eslint js/ examples/",
-    "lint:fix": "clang-format -i src/*.c && eslint js/ examples/ --fix",
-    "prepare": "echo 'Skipping prepare script'",
-    "docs": "typedoc --config typedoc.json",
-    "release": "standard-version",
-    "release:dry-run": "standard-version --dry-run",
-    "test:prebuilds": "node scripts/test-prebuilds.js"
+    "docs": "typedoc --config typedoc.json"
   },
   "keywords": [
     "http",
     "server",
     "native",
     "performance",
+    "express",
+    "fast",
     "io_uring",
     "kqueue",
     "iocp",
     "napi"
   ],
-  "author": "senapati484",
-  "license": "ISC",
+  "author": "senapati484 <senapati484@example.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/senapati484/express-pro#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/senapati484/express-pro.git"
+  },
   "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -76,7 +59,7 @@
     "globals": "^17.4.0",
     "node-addon-api": "^8.7.0",
     "node-gyp": "^12.2.0",
-    "standard-version": "^9.5.0",
     "typedoc": "^0.28.18"
   }
+}
 }

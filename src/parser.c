@@ -14,6 +14,12 @@
 
 #include "server.h"
 
+/* Suppress unused function warning for fallback implementation */
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
 /* xp_memmem is a GNU extension, not in POSIX.1-2001 */
 /* Provide our own implementation to avoid conflicts */
 static void* xp_memmem(const void* haystack, size_t haystack_len,
@@ -31,6 +37,10 @@ static void* xp_memmem(const void* haystack, size_t haystack_len,
   }
   return NULL;
 }
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
 
 /* ============================================================================
  * Error Codes

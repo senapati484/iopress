@@ -14,6 +14,12 @@
 
 static fast_router_t router = {0};
 
+/* Suppress unused function warnings for reserved functions */
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
 /* Initialize router */
 void fast_router_init(void) {
   memset(&router, 0, sizeof(router));
@@ -41,6 +47,10 @@ static int strncasecmp_custom(const char* s1, const char* s2, size_t n) {
   }
   return 0;
 }
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
 
 /* Register a fast route */
 int fast_router_register(const char* method, const char* path,
@@ -80,11 +90,20 @@ int fast_router_register(const char* method, const char* path,
   return 0;
 }
 
-/* Optimized direct match for most common paths (B8: O(1) health check) */
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
+/* Optimized direct match for most common paths */
 static inline int match_exact(const char* path, size_t path_len,
                               const char* target, size_t target_len) {
   return (path_len == target_len) && (memcmp(path, target, path_len) == 0);
 }
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
 
 /* Try to handle request in fast path */
 int fast_router_try_handle(const char* method, size_t method_len,

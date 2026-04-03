@@ -25,6 +25,12 @@
 #include "parser.h"
 #include "server.h"
 
+/* Suppress unused function warnings for fallback implementations */
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
 /* xp_memmem is a GNU extension, not in POSIX.1-2001 */
 /* Provide our own implementation */
 static void* xp_memmem(const void* haystack, size_t haystack_len,
@@ -42,6 +48,10 @@ static void* xp_memmem(const void* haystack, size_t haystack_len,
   }
   return NULL;
 }
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
 
 /* ============================================================================
  * Platform Context
@@ -231,6 +241,11 @@ static connection_t* get_connection(connection_t* pool, size_t pool_size,
   return conn;
 }
 
+#if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
 static void reset_connection(connection_t* conn) {
   if (conn == NULL) return;
 
@@ -323,7 +338,7 @@ static int format_http_response_fast(int status_code, const uint8_t* body,
   out[6] = '.';
   out[7] = '1';
   out[8] = ' ';
-  char* p = out + 9;
+  char* p = (char*)out + 9;
   fast_itoa(status_code, p);
   while (*p) p++;
   *p++ = ' ';
@@ -470,6 +485,10 @@ static void handle_new_connection(kevent_context_t* ctx) {
     }
   }
 }
+
+#if defined(__APPLE__)
+#pragma clang diagnostic pop
+#endif
 
 static void handle_client_read(kevent_context_t* ctx, int fd,
                                connection_t* conn) {
