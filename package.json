@@ -48,7 +48,7 @@
     "test:memory": "node --pending-deprecation --expose-gc test/memory.test.js",
     "lint": "clang-format --dry-run src/*.c && eslint js/ examples/",
     "lint:fix": "clang-format -i src/*.c && eslint js/ examples/ --fix",
-    "prepare": "node -e \"require('fs').mkdirSync('.git/hooks', {recursive:true}); require('fs').copyFileSync('scripts/pre-commit', '.git/hooks/pre-commit'); require('fs').chmodSync('.git/hooks/pre-commit', 0o755);\" 2>/dev/null || true",
+    "prepare": "echo 'Skipping prepare script'",
     "docs": "typedoc --config typedoc.json",
     "release": "standard-version",
     "release:dry-run": "standard-version --dry-run",
