@@ -15,6 +15,7 @@
 
 #include "parser.h"
 #include "server.h"
+#include "fast_router.h"
 
 /* ============================================================================
  * Thread-Safe Function Context
@@ -52,6 +53,66 @@ typedef struct {
 } request_data_t;
 
 /* ============================================================================
+ * Fast Path Constants
+ * ============================================================================
+ */
+
+#define FAST_PATH_ENABLED 1
+#define MAX_CACHED_PATHS 32
+#define MAX_CACHE_RESPONSE_SIZE 1024
+
+/* ============================================================================
+ * Response Cache for Fast Path
+ * ============================================================================
+ */
+
+typedef struct {
+  char path[128];
+  uint8_t response[MAX_CACHE_RESPONSE_SIZE];
+  size_t response_len;
+  uint16_t status_code;
+  int hit_count;
+  int active;
+} fast_path_cache_t;
+
+static fast_path_cache_t fast_cache[MAX_CACHED_PATHS];
+static int cache_initialized = 0;
+
+static void init_fast_cache(void) {
+  if (cache_initialized) return;
+
+  // Pre-populate common endpoints
+  const char* health_path = "/health";
+  const char* health_response = "{\"status\":\"ok\"}";
+  size_t health_len = strlen(health_response);
+
+  strncpy(fast_cache[0].path, health_path, 127);
+  memcpy(fast_cache[0].response, health_response, health_len);
+  fast_cache[0].response_len = health_len;
+  fast_cache[0].status_code = 200;
+  fast_cache[0].hit_count = 0;
+  fast_cache[0].active = 1;
+
+  cache_initialized = 1;
+}
+
+static fast_path_cache_t* find_in_cache(const char* path, size_t path_len) {
+  if (!cache_initialized) init_fast_cache();
+
+  for (int i = 0; i < MAX_CACHED_PATHS; i++) {
+    if (!fast_cache[i].active) continue;
+
+    if (strncmp(fast_cache[i].path, path, path_len) == 0 &&
+        fast_cache[i].path[path_len] == '\0') {
+      fast_cache[i].hit_count++;
+      return &fast_cache[i];
+    }
+  }
+
+  return NULL;
+}
+
+/* ============================================================================
  * C Request Handler (Called from server thread)
  * ============================================================================
  */
@@ -60,7 +121,29 @@ static int on_request_c_handler(connection_t* conn,
                                 const parse_result_t* result, void* user_data) {
   (void)user_data;
 
-  /* Allocate request data for thread-safe passing */
+  /* Try fast router first (C-only, no JavaScript) */
+  uint8_t* fast_response = NULL;
+  size_t fast_response_len = 0;
+  uint16_t fast_status = 200;
+
+  int fast_result = fast_router_try_handle(
+      (const char*)result->method, result->method_len,
+      (const char*)result->path, result->path_len,
+      &fast_response, &fast_response_len, &fast_status);
+
+  if (fast_result == 0) {
+    /* Handled in C! No JavaScript crossing */
+    response_t resp = {0};
+    resp.status_code = fast_status;
+    resp.body = fast_response;
+    resp.body_len = fast_response_len;
+    resp.is_last = 1;
+
+    server_send_response(g_context.server, conn, &resp);
+    return 0;
+  }
+
+  /* Standard path: Allocate and pass to JS */
   request_data_t* req_data = calloc(1, sizeof(request_data_t));
   if (!req_data) return -1;
 
@@ -93,7 +176,6 @@ static int on_request_c_handler(connection_t* conn,
     }
   }
 
-  g_context.current_conn = conn;
   g_context.current_conn = conn;
 
   /* Call thread-safe function (non-blocking) */
@@ -302,6 +384,44 @@ napi_value RegisterRoute(napi_env env, napi_callback_info info) {
   return NULL;
 }
 
+napi_value RegisterFastRoute(napi_env env, napi_callback_info info) {
+  size_t argc = 4;
+  napi_value args[4];
+  napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+
+  if (argc < 4) {
+    napi_throw_error(env, NULL, "Expected 4 args: method, path, statusCode, response");
+    return NULL;
+  }
+
+  /* Get method */
+  char method[8];
+  size_t method_len;
+  napi_get_value_string_utf8(env, args[0], method, sizeof(method), &method_len);
+
+  /* Get path */
+  char path[128];
+  size_t path_len;
+  napi_get_value_string_utf8(env, args[1], path, sizeof(path), &path_len);
+
+  /* Get status code */
+  int32_t status;
+  napi_get_value_int32(env, args[2], &status);
+
+  /* Get response body */
+  char response[4096];
+  size_t response_len;
+  napi_get_value_string_utf8(env, args[3], response, sizeof(response), &response_len);
+
+  /* Register with fast router */
+  fast_router_register(method, path, ROUTE_TYPE_STATIC_JSON, status,
+                       "application/json", (uint8_t*)response, response_len);
+
+  napi_value result;
+  napi_get_undefined(env, &result);
+  return result;
+}
+
 napi_value Listen(napi_env env, napi_callback_info info) {
   size_t argc = 3;
   napi_value args[3];
@@ -425,6 +545,28 @@ napi_value StreamData(napi_env env, napi_callback_info info) {
   return NULL;
 }
 
+/**
+ * Close the server
+ */
+napi_value Close(napi_env env, napi_callback_info info) {
+  (void)info;
+
+  if (g_context.server) {
+    server_stop(g_context.server, 0);
+    g_context.server = NULL;
+  }
+
+  /* Release the threadsafe function */
+  if (g_context.tsfn) {
+    napi_release_threadsafe_function(g_context.tsfn, napi_tsfn_abort);
+    g_context.tsfn = NULL;
+  }
+
+  napi_value result;
+  napi_get_boolean(env, true, &result);
+  return result;
+}
+
 /* ============================================================================
  * Module Initialization
  * ============================================================================
@@ -433,10 +575,18 @@ napi_value StreamData(napi_env env, napi_callback_info info) {
 napi_value Init(napi_env env, napi_value exports) {
   napi_value fn;
 
+  /* Initialize fast router with default routes */
+  fast_router_register_defaults();
+
   /* RegisterRoute */
   napi_create_function(env, "RegisterRoute", NAPI_AUTO_LENGTH, RegisterRoute,
                        NULL, &fn);
   napi_set_named_property(env, exports, "RegisterRoute", fn);
+
+  /* RegisterFastRoute */
+  napi_create_function(env, "RegisterFastRoute", NAPI_AUTO_LENGTH, RegisterFastRoute,
+                       NULL, &fn);
+  napi_set_named_property(env, exports, "RegisterFastRoute", fn);
 
   /* Listen */
   napi_create_function(env, "Listen", NAPI_AUTO_LENGTH, Listen, NULL, &fn);
@@ -457,6 +607,10 @@ napi_value Init(napi_env env, napi_value exports) {
                        &fn);
   napi_set_named_property(env, exports, "StreamData", fn);
 
+  /* Close */
+  napi_create_function(env, "Close", NAPI_AUTO_LENGTH, Close, NULL, &fn);
+  napi_set_named_property(env, exports, "Close", fn);
+
   /* Export version info */
   napi_value version;
   napi_create_string_utf8(env, "1.0.0", NAPI_AUTO_LENGTH, &version);
@@ -466,6 +620,12 @@ napi_value Init(napi_env env, napi_value exports) {
   napi_create_string_utf8(env, server_get_platform(), NAPI_AUTO_LENGTH,
                           &platform);
   napi_set_named_property(env, exports, "platform", platform);
+
+  /* Export backend (same as platform) */
+  napi_value backend;
+  napi_create_string_utf8(env, server_get_platform(), NAPI_AUTO_LENGTH,
+                          &backend);
+  napi_set_named_property(env, exports, "backend", backend);
 
   return exports;
 }

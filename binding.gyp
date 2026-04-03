@@ -5,7 +5,8 @@
       "sources": [
         "src/binding.c",
         "src/router.c",
-        "src/parser.c"
+        "src/parser.c",
+        "src/fast_router.c"
       ],
       "cflags": [
         "-O3",

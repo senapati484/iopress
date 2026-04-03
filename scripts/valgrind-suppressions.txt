@@ -1,0 +1,52 @@
+# Valgrind suppressions for Express-Pro
+#
+# These suppress known "false positive" memory issues from V8 and Node.js
+
+# V8 and Node.js runtime allocations (expected to be reachable)
+{
+   v8_startup
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*v8*
+   ...
+}
+
+{
+   node_startup
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*node*
+   ...
+}
+
+# N-API runtime allocations (expected for module caching)
+{
+   napi_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*napi*
+   ...
+}
+
+# OpenSSL allocations (loaded by Node.js)
+{
+   openssl_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*SSL*
+   ...
+}
+
+# libuv internal allocations
+{
+   libuv_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*uv*
+   ...
+}

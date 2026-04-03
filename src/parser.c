@@ -14,11 +14,10 @@
 
 #include "server.h"
 
-/* memmem is a GNU extension, not in POSIX.1-2001 */
-/* Provide fallback for platforms without it */
-#if !defined(_GNU_SOURCE) && !defined(__APPLE__) && !defined(__FreeBSD__)
-static void* memmem(const void* haystack, size_t haystack_len,
-                    const void* needle, size_t needle_len) {
+/* xp_memmem is a GNU extension, not in POSIX.1-2001 */
+/* Provide our own implementation to avoid conflicts */
+static void* xp_memmem(const void* haystack, size_t haystack_len,
+                       const void* needle, size_t needle_len) {
   if (needle_len == 0) return (void*)haystack;
   if (haystack_len < needle_len) return NULL;
 
@@ -32,7 +31,6 @@ static void* memmem(const void* haystack, size_t haystack_len,
   }
   return NULL;
 }
-#endif
 
 /* ============================================================================
  * Error Codes
@@ -65,7 +63,7 @@ static void* memmem(const void* haystack, size_t haystack_len,
  * Case-insensitive string compare (limited length).
  * Used for header name comparison.
  */
-static int strncasecmp_l(const char* s1, const char* s2, size_t n) {
+static int xp_strncasecmp_l(const char* s1, const char* s2, size_t n) {
   while (n > 0) {
     char c1 = (char)tolower((unsigned char)*s1);
     char c2 = (char)tolower((unsigned char)*s2);
@@ -115,7 +113,7 @@ static const char* find_content_length(const char* headers_start,
       /* Skip leading whitespace */
       while (p < line_end && isspace((unsigned char)*p)) p++;
 
-      if (strncasecmp_l(p, content_length_name, name_len) == 0) {
+      if (xp_strncasecmp_l(p, content_length_name, name_len) == 0) {
         /* Found it - move past header name */
         const char* val = p + name_len;
 
@@ -260,7 +258,7 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   }
 
   /* Check for HTTP version */
-  if (p + 8 < end && strncasecmp_l(p, "HTTP/", 5) == 0 &&
+  if (p + 8 < end && xp_strncasecmp_l(p, "HTTP/", 5) == 0 &&
       isdigit((unsigned char)p[5]) && p[6] == '.' &&
       isdigit((unsigned char)p[7])) {
     result->http_major = (uint8_t)(p[5] - '0');
@@ -356,13 +354,13 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   bool chunked = false;
   const char* te_start = headers_start;
   while (te_start < headers_end) {
-    if (strncasecmp_l(te_start, "transfer-encoding", 17) == 0) {
+    if (xp_strncasecmp_l(te_start, "transfer-encoding", 17) == 0) {
       /* Found Transfer-Encoding header */
       const char* colon = memchr(te_start, ':', headers_end - te_start);
       if (colon != NULL) {
         const char* val = colon + 1;
         while (val < headers_end && isspace((unsigned char)*val)) val++;
-        if (strncasecmp_l(val, "chunked", 7) == 0) {
+        if (xp_strncasecmp_l(val, "chunked", 7) == 0) {
           chunked = true;
           break;
         }
@@ -388,7 +386,7 @@ int http_parse_request(const uint8_t* buffer, size_t len,
     /* Simplified: just check if we have some data */
     if (body_received >= 5) {
       /* Check for termination */
-      const char* term = memmem(headers_end, body_received, "0\r\n\r\n", 5);
+      const char* term = xp_memmem(headers_end, body_received, "0\r\n\r\n", 5);
       if (term != NULL) {
         result->status = PARSE_STATUS_DONE;
         return result->status;

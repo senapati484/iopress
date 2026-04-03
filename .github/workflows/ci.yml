@@ -67,6 +67,10 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Security audit
+        run: npm audit --audit-level=high
+        continue-on-error: false
+
       - name: Run linter
         if: runner.os != 'Windows'
         run: npm run lint
@@ -77,6 +81,11 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Run benchmark regression test
+        if: runner.os != 'Windows'
+        run: npm run bench:ci
+        timeout-minutes: 2
 
       - name: Upload build artifacts
         if: failure()

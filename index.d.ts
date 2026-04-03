@@ -226,6 +226,15 @@ declare namespace ExpressPro {
  * @param options Configuration options
  * @returns ExpressPro application instance
  */
-declare function ExpressPro(options?: ExpressPro.ExpressProOptions): ExpressPro.ExpressProClass;
+declare function expresspro(options?: ExpressPro.ExpressProOptions): ExpressPro.ExpressProClass;
 
-export = ExpressPro;
+declare namespace expresspro {
+  export const version: string;
+  export const platform: string;
+  export const backend: string;
+  export const ExpressPro: typeof ExpressPro.ExpressProClass;
+  export const Request: typeof ExpressPro.Request;
+  export const Response: typeof ExpressPro.Response;
+}
+
+export = expresspro;

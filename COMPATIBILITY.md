@@ -22,7 +22,7 @@ This document defines the Express.js API compatibility surface for ExpressPro v1
 
 | Feature | Express 4 | ExpressPro v1 | Notes |
 |---------|-----------|-----------------|-------|
-| `express()` / `expressPro()` | ✅ | ✅ | Factory function equivalent |
+| `express()` / `expresspro()` | ✅ | ✅ | Factory function equivalent |
 | `app.use()` | ✅ | ✅ | Middleware mounting with path support |
 | `app.get()` | ✅ | ✅ | Route registration |
 | `app.post()` | ✅ | ✅ | Route registration |
@@ -140,13 +140,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ExpressPro v1
-const app = expressPro({
+const app = expresspro({
   maxBodySize: 10 * 1024 * 1024,  // 10MB
   streamBody: false               // Buffer entire body (default)
 });
 
 // For streaming large bodies
-const app = expressPro({
+const app = expresspro({
   maxBodySize: 0,      // Unlimited (use with care)
   streamBody: true     // Stream data chunks
 });
