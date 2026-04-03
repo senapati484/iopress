@@ -10,8 +10,8 @@
  * @author senapati484
  *
  * @example
- * const expresspro = require('express-pro');
- * const app = expresspro();
+ * const expressmax = require('express-pro');
+ * const app = expressmax();
  *
  * app.get('/hello', (req, res) => {
  *   res.json({ message: 'Hello World' });
@@ -389,11 +389,11 @@ class Response {
  * Main application class for creating HTTP servers with Express-compatible API.
  * Supports middleware, routing, error handling, and method chaining.
  *
- * @class ExpressPro
+ * @class ExpressMax
  * @since 1.0.0
  *
  * @example
- * const app = expresspro();
+ * const app = expressmax();
  *
  * // Middleware
  * app.use((req, res, next) => {
@@ -414,12 +414,22 @@ class Response {
  * // Start server
  * app.listen(3000);
  */
-class ExpressPro {
-  /**
-   * Create a new ExpressPro application instance.
-   *
-   * @since 1.0.0
-   */
+class ExpressMax {
+/**
+ * ExpressMax - High-Performance Native HTTP Server
+ *
+ * @module expressmax
+ * @description A blazing fast native HTTP server that uses platform-specific
+ *              async I/O backends (io_uring on Linux, kqueue on macOS, IOCP on Windows)
+ *              to deliver 8x+ performance compared to Express.js.
+ *
+ * @example
+ * const expressmax = require('expressmax');
+ * const app = expressmax();
+ *
+ * app.get('/', (req, res) => res.json({ message: 'Hello, World!' }));
+ * app.listen(3000);
+ */
   constructor() {
     this.routes = [];
     this.middleware = [];
@@ -435,7 +445,7 @@ class ExpressPro {
    *
    * @param {string|Function} path - Path pattern or middleware function
    * @param {...Function} handlers - Middleware handler functions
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -472,7 +482,7 @@ class ExpressPro {
    *
    * @param {string} path - Route pattern (e.g., '/users/:id')
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -495,7 +505,7 @@ class ExpressPro {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -514,7 +524,7 @@ class ExpressPro {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -533,7 +543,7 @@ class ExpressPro {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -552,7 +562,7 @@ class ExpressPro {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -573,7 +583,7 @@ class ExpressPro {
    * send an error response.
    *
    * @param {Function} handler - Error handler function (err, req, res, next)
-   * @returns {ExpressPro} Returns this for method chaining
+   * @returns {ExpressMax} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -836,18 +846,18 @@ class ExpressPro {
 }
 
 /**
- * Factory function to create an ExpressPro application.
+ * Factory function to create an ExpressMax application.
  *
- * Creates and returns a new ExpressPro application instance.
+ * Creates and returns a new ExpressMax application instance.
  * This is the default export and recommended way to create apps.
  *
- * @function expresspro
- * @returns {ExpressPro} New ExpressPro application instance
+ * @function expressmax
+ * @returns {ExpressMax} New ExpressMax application instance
  * @since 1.0.0
  *
  * @example
- * const expresspro = require('express-pro');
- * const app = expresspro();
+ * const expressmax = require('express-pro');
+ * const app = expressmax();
  *
  * app.get('/', (req, res) => {
  *   res.json({ hello: 'world' });
@@ -855,8 +865,8 @@ class ExpressPro {
  *
  * app.listen(3000);
  */
-function expresspro() {
-  return new ExpressPro();
+function expressmax() {
+  return new ExpressMax();
 }
 
 /**
@@ -865,7 +875,7 @@ function expresspro() {
  * @since 1.0.0
  * @static
  */
-expresspro.version = native.version;
+expressmax.version = native.version;
 
 /**
  * Current platform identifier.
@@ -873,7 +883,7 @@ expresspro.version = native.version;
  * @since 1.0.0
  * @static
  */
-expresspro.platform = native.platform;
+expressmax.platform = native.platform;
 
 /**
  * Async I/O backend being used.
@@ -887,16 +897,16 @@ expresspro.platform = native.platform;
  * @since 1.0.0
  * @static
  */
-expresspro.backend = native.backend;
+expressmax.backend = native.backend;
 
 /**
- * ExpressPro Application Class.
+ * ExpressMax Application Class.
  *
- * @type {typeof ExpressPro}
+ * @type {typeof ExpressMax}
  * @since 1.0.0
  * @static
  */
-expresspro.expresspro = ExpressPro;
+expressmax.expressmax = ExpressMax;
 
 /**
  * Request Class.
@@ -905,7 +915,7 @@ expresspro.expresspro = ExpressPro;
  * @since 1.0.0
  * @static
  */
-expresspro.Request = Request;
+expressmax.Request = Request;
 
 /**
  * Response Class.
@@ -914,7 +924,7 @@ expresspro.Request = Request;
  * @since 1.0.0
  * @static
  */
-expresspro.Response = Response;
+expressmax.Response = Response;
 
 // Export module
-module.exports = expresspro;
+module.exports = expressmax;

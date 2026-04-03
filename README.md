@@ -1,4 +1,4 @@
-# Express-Pro
+# ExpressMax
 
 High-performance native HTTP server for Node.js with platform-specific async I/O. Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows) for maximum throughput with minimal latency.
 
@@ -30,7 +30,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ## Installation
 
 ```bash
-npm install express-pro
+npm install expressmax
 ```
 
 ### Platform Prerequisites
@@ -58,7 +58,7 @@ npm install express-pro
 ## Quickstart
 
 ```javascript
-const expresspro = require('express-pro');
+const expresspro = require('expressmax');
 
 // Create application instance
 const app = expresspro();
@@ -102,12 +102,12 @@ app.listen(3000, () => {
 
 ## API Reference
 
-### ExpressPro(options?)
+### ExpressMax(options?)
 
-Creates a new Express-Pro application instance.
+Creates a new ExpressMax application instance.
 
 ```javascript
-const expresspro = require('express-pro');
+const expressmax = require('expressmax');
 
 // Default options
 const app = expresspro();
@@ -347,7 +347,7 @@ res.end('Final chunk');
 ### Module Properties
 
 ```javascript
-const expresspro = require('express-pro');
+const expresspro = require('expressmax');
 
 console.log(expresspro.version);   // '1.0.0'
 console.log(expresspro.platform);  // 'linux', 'darwin', 'win32'
@@ -482,7 +482,7 @@ app.listen(3000);
 
 **Express-Pro:**
 ```javascript
-const expresspro = require('express-pro');
+const expresspro = require('expressmax');
 const app = expresspro();
 
 // No need for express.json() - body parsing is built-in

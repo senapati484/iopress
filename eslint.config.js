@@ -27,6 +27,17 @@ module.exports = [
     }
   },
   {
+    files: ['index.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      globals: {
+        ...globals.node,
+        '__dirname': 'readonly'
+      }
+    }
+  },
+  {
     ignores: ['eslint.config.js']
   }
 ];

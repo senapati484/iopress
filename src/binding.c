@@ -575,7 +575,7 @@ napi_value Listen(napi_env env, napi_callback_info info) {
 
   /* Create thread-safe function */
   napi_value async_resource_name;
-  napi_create_string_utf8(env, "express-pro", NAPI_AUTO_LENGTH,
+  napi_create_string_utf8(env, "expressmax", NAPI_AUTO_LENGTH,
                           &async_resource_name);
 
   napi_threadsafe_function tsfn;

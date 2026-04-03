@@ -1,5 +1,5 @@
 {
-  "name": "express-pro",
+  "name": "expressmax",
   "version": "1.0.0",
   "description": "High-performance native HTTP server - 8x faster than Express.js",
   "main": "index.js",

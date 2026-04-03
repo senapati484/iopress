@@ -1,5 +1,5 @@
 /**
- * Deprecation warning utilities for express-pro
+ * Deprecation warning utilities for expressmax
  * @module deprecation
  */
 
