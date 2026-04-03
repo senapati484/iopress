@@ -42,9 +42,9 @@
 
 'use strict';
 
-const maxpress = require('../index.js');
+const iopress = require('../index.js');
 
-const app = maxpress();
+const app = iopress();
 
 // In-memory data store
 const users = new Map();

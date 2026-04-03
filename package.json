@@ -1,5 +1,5 @@
 {
-  "name": "maxpress",
+  "name": "iopress",
   "version": "1.0.0",
   "description": "High-performance native HTTP server - 8x faster than Express.js",
   "main": "index.js",
@@ -44,10 +44,10 @@
   ],
   "author": "senapati484 <senapati484@example.com>",
   "license": "MIT",
-  "homepage": "https://github.com/senapati484/maxpress#readme",
+  "homepage": "https://github.com/senapati484/iopress#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/senapati484/maxpress.git"
+    "url": "https://github.com/senapati484/iopress.git"
   },
   "dependencies": {},
   "devDependencies": {

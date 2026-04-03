@@ -1,5 +1,5 @@
 /**
- * Deprecation warning utilities for maxpress
+ * Deprecation warning utilities for iopress
  * @module deprecation
  */
 

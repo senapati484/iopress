@@ -1,5 +1,5 @@
 /**
- * maxpress - High-performance native HTTP server
+ * iopress - High-performance native HTTP server
  * TypeScript declarations
  */
 
@@ -7,8 +7,8 @@
 
 import { Buffer } from 'node:buffer';
 
-declare namespace maxpress {
-  interface maxpressOptions {
+declare namespace iopress {
+  interface iopressOptions {
     /** Initial buffer size for request/response handling (default: 16384) */
     initialBufferSize?: number;
     /** Maximum allowed body size in bytes (default: 1048576 = 1MB) */
@@ -132,7 +132,7 @@ declare namespace maxpress {
     backend: string;
   }
 
-  class maxpressClass {
+  class iopressClass {
     /** Module version */
     readonly version: string;
     /** Current platform (linux, macos, windows) */
@@ -140,7 +140,7 @@ declare namespace maxpress {
     /** Async I/O backend being used */
     readonly backend: string;
 
-    constructor(options?: maxpressOptions);
+    constructor(options?: iopressOptions);
 
     /**
      * Register middleware for all routes
@@ -222,19 +222,19 @@ declare namespace maxpress {
 }
 
 /**
- * Create maxpress application instance
+ * Create iopress application instance
  * @param options Configuration options
- * @returns maxpress application instance
+ * @returns iopress application instance
  */
-declare function maxpress(options?: maxpress.maxpressOptions): maxpress.maxpressClass;
+declare function iopress(options?: iopress.iopressOptions): iopress.iopressClass;
 
-declare namespace maxpress {
+declare namespace iopress {
   export const version: string;
   export const platform: string;
   export const backend: string;
-  export const maxpress: typeof maxpress.maxpressClass;
-  export const Request: typeof maxpress.Request;
-  export const Response: typeof maxpress.Response;
+  export const iopress: typeof iopress.iopressClass;
+  export const Request: typeof iopress.Request;
+  export const Response: typeof iopress.Response;
 }
 
-export = maxpress;
+export = iopress;

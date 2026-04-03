@@ -1,5 +1,5 @@
 /**
- * maxpress Integration Tests
+ * iopress Integration Tests
  *
  * Full stack tests using Node.js built-in test runner and native fetch.
  *
@@ -10,18 +10,18 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const maxpress = require('../js/index.js');
+const iopress = require('../js/index.js');
 
 const TEST_PORT = 3459;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
-describe('maxpress Integration Tests', () => {
+describe('iopress Integration Tests', () => {
   let app;
   let server;
 
   // Setup: Create app and start server before all tests
   before(async () => {
-    app = maxpress();
+    app = iopress();
 
     // Health check endpoint
     app.get('/health', (req, res) => {
@@ -331,13 +331,13 @@ describe('maxpress Integration Tests', () => {
 
   describe('Server Info', () => {
     it('should expose version', () => {
-      assert.strictEqual(typeof maxpress.version, 'string');
-      assert.ok(maxpress.version.length > 0);
+      assert.strictEqual(typeof iopress.version, 'string');
+      assert.ok(iopress.version.length > 0);
     });
 
     it('should expose platform', () => {
-      assert.strictEqual(typeof maxpress.platform, 'string');
-      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(maxpress.platform));
+      assert.strictEqual(typeof iopress.platform, 'string');
+      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(iopress.platform));
     });
   });
 });

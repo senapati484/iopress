@@ -2,7 +2,7 @@
 
 set -e
 
-echo "=== maxpress Benchmark ==="
+echo "=== iopress Benchmark ==="
 echo "Platform: $(uname -s)"
 echo "Node: $(node --version)"
 echo ""

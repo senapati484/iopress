@@ -5,7 +5,7 @@
 #include <winsock2.h>
 #include <mswsock.h>
 
-namespace maxpress {
+namespace iopress {
 
 namespace Platform {
 
@@ -32,6 +32,6 @@ class IOCPServer {
 
 }  // namespace Platform
 
-}  // namespace maxpress
+}  // namespace iopress
 
 #endif  // WINDOWS && IOCP

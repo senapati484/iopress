@@ -1,6 +1,6 @@
-# maxpress Roadmap
+# iopress Roadmap
 
-This document outlines the planned features and direction for maxpress. Roadmap items are organized by milestone and version.
+This document outlines the planned features and direction for iopress. Roadmap items are organized by milestone and version.
 
 ## Current Status: v1.0
 
@@ -51,7 +51,7 @@ This document outlines the planned features and direction for maxpress. Roadmap 
 
 **API Considerations**:
 ```javascript
-const app = maxpress({
+const app = iopress({
   http2: true,
   allowHTTP1: true  // Upgrade from HTTP/1.1
 });
@@ -85,7 +85,7 @@ res.push('/static/style.css', {
 
 **API**:
 ```javascript
-const app = maxpress();
+const app = iopress();
 
 app.listen(443, {
   tls: {
@@ -127,7 +127,7 @@ app.listen(443, {
 **Priority**: Medium  
 **Effort**: Medium
 
-- [ ] `maxpress.static()` middleware
+- [ ] `iopress.static()` middleware
 - [ ] Platform-optimized sendfile:
   - Linux: `io_uring` with `IORING_OP_SEND`
   - macOS: `sendfile()` syscall
@@ -138,7 +138,7 @@ app.listen(443, {
 
 **API**:
 ```javascript
-app.use(maxpress.static('public', {
+app.use(iopress.static('public', {
   maxAge: '1d',
   etag: true,
   lastModified: true,
@@ -165,7 +165,7 @@ app.use(maxpress.static('public', {
 **API**:
 ```javascript
 // Option 1: Explicit worker pool
-const worker = require('maxpress/worker');
+const worker = require('iopress/worker');
 
 app.get('/compute', worker((req, res) => {
   // Runs in worker thread
@@ -269,9 +269,9 @@ Roadmap dates are estimates. Priorities may shift based on:
 
 ## References
 
-- [GitHub Projects](https://github.com/senapati484/maxpress/projects) — Kanban boards for v2 development
-- [Milestones](https://github.com/senapati484/maxpress/milestones) — Release planning
-- [Discussions](https://github.com/senapati484/maxpress/discussions) — RFCs and design discussions
+- [GitHub Projects](https://github.com/senapati484/iopress/projects) — Kanban boards for v2 development
+- [Milestones](https://github.com/senapati484/iopress/milestones) — Release planning
+- [Discussions](https://github.com/senapati484/iopress/discussions) — RFCs and design discussions
 
 ---
 

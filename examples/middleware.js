@@ -39,9 +39,9 @@
 
 'use strict';
 
-const maxpress = require('../index.js');
+const iopress = require('../index.js');
 
-const app = maxpress();
+const app = iopress();
 
 // Store for request IDs
 const requestStore = new Map();

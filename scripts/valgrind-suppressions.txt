@@ -1,4 +1,4 @@
-# Valgrind suppressions for maxpress
+# Valgrind suppressions for iopress
 #
 # These suppress known "false positive" memory issues from V8 and Node.js
 

@@ -1,4 +1,4 @@
-# maxpress N-API Binding Contract
+# iopress N-API Binding Contract
 
 > Version: 1.0.0
 > Last Updated: 2026-04-01
@@ -392,7 +392,7 @@ Listen()
 
 ## Error Handling
 
-The error handling strategy in maxpress is designed to **prevent any unhandled exception from crashing the Node process** while providing clear, actionable error information to JavaScript.
+The error handling strategy in iopress is designed to **prevent any unhandled exception from crashing the Node process** while providing clear, actionable error information to JavaScript.
 
 ### Design Principles
 
@@ -637,7 +637,7 @@ if (header_len > MAX_HEADER_SIZE) {
 
 ### JS Handler Exception Safety
 
-When a JS handler throws, N-API catches the exception and maxpress converts it to a 500 response:
+When a JS handler throws, N-API catches the exception and iopress converts it to a 500 response:
 
 ```c
 // In threadsafe function callback
@@ -702,7 +702,7 @@ app.get('/async-crash', async (req, res) => {
 |--------|--------|---------|
 | `E` | POSIX errno | `ECONNRESET`, `EPIPE`, `ETIMEDOUT` |
 | `NAPI_` | Node-API internal | `NAPI_GENERIC_FAILURE` |
-| `EXPR_` | maxpress application | `EXPR_ETOOBIG`, `EXPR_EPARSE` |
+| `EXPR_` | iopress application | `EXPR_ETOOBIG`, `EXPR_EPARSE` |
 
 ---
 

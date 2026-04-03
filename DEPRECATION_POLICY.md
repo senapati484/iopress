@@ -1,6 +1,6 @@
 # Deprecation Policy
 
-This document defines how maxpress manages API deprecations and breaking changes.
+This document defines how iopress manages API deprecations and breaking changes.
 
 ## Policy Overview
 
@@ -46,7 +46,7 @@ v2.0: Feature removed (breaking change)
 Deprecated features emit warnings via `process.emitWarning()`:
 
 ```
-(node:12345) DeprecationWarning: maxpress: 'legacyMode' option is deprecated since v1.3.0, will be removed in v2.0.0. Use 'mode: "modern"' instead.
+(node:12345) DeprecationWarning: iopress: 'legacyMode' option is deprecated since v1.3.0, will be removed in v2.0.0. Use 'mode: "modern"' instead.
 ```
 
 ### Enabling Deprecation Warnings

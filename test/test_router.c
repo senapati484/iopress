@@ -1,5 +1,5 @@
 /**
- * maxpress HTTP Router Test Suite
+ * iopress HTTP Router Test Suite
  *
  * Standalone test binary for the trie-based router.
  *
@@ -431,7 +431,7 @@ void test_static_vs_param_precedence(void) {
  */
 
 int main(void) {
-  printf("\033[1mmaxpress HTTP Router Test Suite\033[0m\n");
+  printf("\033[1miopress HTTP Router Test Suite\033[0m\n");
   printf("====================================\n\n");
 
   test_basic_routes();

@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-namespace maxpress {
+namespace iopress {
 
 namespace Platform {
 
@@ -33,6 +33,6 @@ class KQueueServer {
 
 }  // namespace Platform
 
-}  // namespace maxpress
+}  // namespace iopress
 
 #endif  // MACOS && KQUEUE

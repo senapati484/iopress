@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Pre-commit hook for maxpress
+# Pre-commit hook for iopress
 # Runs linting on staged files
 #
 

@@ -1,17 +1,17 @@
 /**
- * maxpress JavaScript API
+ * iopress JavaScript API
  *
  * High-performance native HTTP server with Express-compatible API.
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
- * @module maxpress
+ * @module iopress
  * @version 1.0.0
  * @license ISC
  * @author senapati484
  *
  * @example
- * const maxpress = require('maxpress');
- * const app = maxpress();
+ * const iopress = require('iopress');
+ * const app = iopress();
  *
  * app.get('/hello', (req, res) => {
  *   res.json({ message: 'Hello World' });
@@ -384,16 +384,16 @@ class Response {
 }
 
 /**
- * maxpress Application Class.
+ * iopress Application Class.
  *
  * Main application class for creating HTTP servers with Express-compatible API.
  * Supports middleware, routing, error handling, and method chaining.
  *
- * @class maxpress
+ * @class iopress
  * @since 1.0.0
  *
  * @example
- * const app = maxpress();
+ * const app = iopress();
  *
  * // Middleware
  * app.use((req, res, next) => {
@@ -414,18 +414,18 @@ class Response {
  * // Start server
  * app.listen(3000);
  */
-class Maxpress {
+class IOpress {
 /**
- * maxpress - High-Performance Native HTTP Server
+ * iopress - High-Performance Native HTTP Server
  *
- * @module maxpress
+ * @module iopress
  * @description A blazing fast native HTTP server that uses platform-specific
  *              async I/O backends (io_uring on Linux, kqueue on macOS, IOCP on Windows)
  *              to deliver 8x+ performance compared to Express.js.
  *
  * @example
- * const maxpress = require('maxpress');
- * const app = maxpress();
+ * const iopress = require('iopress');
+ * const app = iopress();
  *
  * app.get('/', (req, res) => res.json({ message: 'Hello, World!' }));
  * app.listen(3000);
@@ -445,7 +445,7 @@ class Maxpress {
    *
    * @param {string|Function} path - Path pattern or middleware function
    * @param {...Function} handlers - Middleware handler functions
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -482,7 +482,7 @@ class Maxpress {
    *
    * @param {string} path - Route pattern (e.g., '/users/:id')
    * @param {...Function} handlers - Route handler functions
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -505,7 +505,7 @@ class Maxpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -524,7 +524,7 @@ class Maxpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -543,7 +543,7 @@ class Maxpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -562,7 +562,7 @@ class Maxpress {
    *
    * @param {string} path - Route pattern
    * @param {...Function} handlers - Route handler functions
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -583,7 +583,7 @@ class Maxpress {
    * send an error response.
    *
    * @param {Function} handler - Error handler function (err, req, res, next)
-   * @returns {maxpress} Returns this for method chaining
+   * @returns {iopress} Returns this for method chaining
    * @throws {TypeError} Throws if handler is not a function
    * @since 1.0.0
    *
@@ -846,18 +846,18 @@ class Maxpress {
 }
 
 /**
- * Factory function to create an maxpress application.
+ * Factory function to create an iopress application.
  *
- * Creates and returns a new maxpress application instance.
+ * Creates and returns a new iopress application instance.
  * This is the default export and recommended way to create apps.
  *
- * @function maxpress
- * @returns {maxpress} New maxpress application instance
+ * @function iopress
+ * @returns {iopress} New iopress application instance
  * @since 1.0.0
  *
  * @example
- * const maxpress = require('maxpress');
- * const app = maxpress();
+ * const iopress = require('iopress');
+ * const app = iopress();
  *
  * app.get('/', (req, res) => {
  *   res.json({ hello: 'world' });
@@ -865,8 +865,8 @@ class Maxpress {
  *
  * app.listen(3000);
  */
-function createMaxpress() {
-  return new Maxpress();
+function createIOpress() {
+  return new IOpress();
 }
 
 /**
@@ -875,7 +875,7 @@ function createMaxpress() {
  * @since 1.0.0
  * @static
  */
-createMaxpress.version = native.version;
+createIOpress.version = native.version;
 
 /**
  * Current platform identifier.
@@ -883,7 +883,7 @@ createMaxpress.version = native.version;
  * @since 1.0.0
  * @static
  */
-createMaxpress.platform = native.platform;
+createIOpress.platform = native.platform;
 
 /**
  * Async I/O backend being used.
@@ -897,14 +897,14 @@ createMaxpress.platform = native.platform;
  * @since 1.0.0
  * @static
  */
-createMaxpress.backend = native.backend;
+createIOpress.backend = native.backend;
 
 /**
- * Alias to the Maxpress class.
- * @type {typeof Maxpress}
+ * Alias to the IOpress class.
+ * @type {typeof IOpress}
  * @static
  */
-createMaxpress.Maxpress = Maxpress;
+createIOpress.IOpress = IOpress;
 
 /**
  * Request Class.
@@ -913,7 +913,7 @@ createMaxpress.Maxpress = Maxpress;
  * @since 1.0.0
  * @static
  */
-createMaxpress.Request = Request;
+createIOpress.Request = Request;
 
 /**
  * Response Class.
@@ -922,7 +922,7 @@ createMaxpress.Request = Request;
  * @since 1.0.0
  * @static
  */
-createMaxpress.Response = Response;
+createIOpress.Response = Response;
 
 // Export module
-module.exports = createMaxpress;
+module.exports = createIOpress;

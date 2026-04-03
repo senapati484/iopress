@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-namespace maxpress {
+namespace iopress {
 
 namespace Platform {
 
@@ -32,6 +32,6 @@ class EpollServer {
 
 }  // namespace Platform
 
-}  // namespace maxpress
+}  // namespace iopress
 
 #endif  // LINUX && !IO_URING

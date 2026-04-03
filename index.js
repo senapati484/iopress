@@ -13,6 +13,6 @@ if (existsSync(buildPath + '.node')) {
   );
 }
 
-const maxpress = require('./js/index.js');
+const iopress = require('./js/index.js');
 
-module.exports = maxpress;
+module.exports = iopress;

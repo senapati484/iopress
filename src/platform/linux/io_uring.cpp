@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-namespace maxpress {
+namespace iopress {
 
 namespace Platform {
 
@@ -33,6 +33,6 @@ class IoURingServer {
 
 }  // namespace Platform
 
-}  // namespace maxpress
+}  // namespace iopress
 
 #endif  // LINUX && IO_URING

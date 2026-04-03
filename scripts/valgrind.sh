@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# maxpress Valgrind Memory Check
+# iopress Valgrind Memory Check
 #
 # Run with: npm run memcheck
 #
@@ -9,7 +9,7 @@
 
 set -e
 
-echo "=== maxpress Valgrind Memory Check ==="
+echo "=== iopress Valgrind Memory Check ==="
 echo ""
 
 # Check if running on Linux
@@ -40,9 +40,9 @@ echo "This will take a few minutes."
 echo ""
 
 # Create a simple server script for Valgrind
-cat > /tmp/maxpress-valgrind-server.js << 'EOF'
-const maxpress = require('./js/index.js');
-const app = maxpress();
+cat > /tmp/iopress-valgrind-server.js << 'EOF'
+const iopress = require('./js/index.js');
+const app = iopress();
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -68,7 +68,7 @@ valgrind \
     --error-exitcode=1 \
     --suppressions=./scripts/valgrind-suppressions.txt \
     --log-file=./valgrind.log \
-    node --expose-gc /tmp/maxpress-valgrind-server.js &
+    node --expose-gc /tmp/iopress-valgrind-server.js &
 
 VALGRIND_PID=$!
 
@@ -110,7 +110,7 @@ else
 fi
 
 # Cleanup
-rm -f /tmp/maxpress-valgrind-server.js
+rm -f /tmp/iopress-valgrind-server.js
 
 echo ""
 echo "Done."

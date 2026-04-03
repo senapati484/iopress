@@ -1,7 +1,7 @@
 #include "../include/common.h"
 #include <napi.h>
 
-namespace maxpress {
+namespace iopress {
 
 namespace Util {
 
@@ -12,4 +12,4 @@ Napi::Value ParseConfig(const Napi::CallbackInfo& info) {
 
 }  // namespace Util
 
-}  // namespace maxpress
+}  // namespace iopress

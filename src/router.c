@@ -1,5 +1,5 @@
 /**
- * maxpress HTTP Router Implementation
+ * iopress HTTP Router Implementation
  *
  * O(k) trie-based router with :param support.
  *

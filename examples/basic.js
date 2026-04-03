@@ -1,8 +1,8 @@
 /**
- * Basic Example - maxpress Hello World
+ * Basic Example - iopress Hello World
  *
  * Demonstrates:
- * - Creating an maxpress application
+ * - Creating an iopress application
  * - Simple GET and POST routes
  * - JSON response handling
  * - Starting the server
@@ -28,22 +28,22 @@
 
 'use strict';
 
-const maxpress = require('../index.js');
+const iopress = require('../index.js');
 
 // Create application
-const app = maxpress();
+const app = iopress();
 
-console.log('maxpress v' + maxpress.version);
-console.log('Platform:', maxpress.platform);
-console.log('Backend:', maxpress.backend);
+console.log('iopress v' + iopress.version);
+console.log('Platform:', iopress.platform);
+console.log('Backend:', iopress.backend);
 
 // GET /
 app.get('/', (req, res) => {
   res.json({
-    message: 'Hello from maxpress!',
+    message: 'Hello from iopress!',
     timestamp: Date.now(),
-    platform: maxpress.platform,
-    backend: maxpress.backend
+    platform: iopress.platform,
+    backend: iopress.backend
   });
 });
 
@@ -59,9 +59,9 @@ app.get('/health', (req, res) => {
 // GET /info - Server information
 app.get('/info', (req, res) => {
   res.json({
-    version: maxpress.version,
-    platform: maxpress.platform,
-    backend: maxpress.backend,
+    version: iopress.version,
+    platform: iopress.platform,
+    backend: iopress.backend,
     nodeVersion: process.version
   });
 });

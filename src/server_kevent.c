@@ -1,5 +1,5 @@
 /**
- * maxpress kqueue Backend (macOS/BSD)
+ * iopress kqueue Backend (macOS/BSD)
  *
  * High-performance event-driven HTTP server using kqueue.
  *
