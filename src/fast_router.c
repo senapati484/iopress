@@ -26,15 +26,41 @@ void fast_router_init(void) {
   router.route_count = 0;
   router.fast_hits = 0;
   router.slow_falls = 0;
+  /* Clear hash table */
+  for (int i = 0; i < 256; i++) {
+    router.hash_table[i] = NULL;
+  }
 }
 
 /* Simple hash for path lookup */
 static uint32_t hash_path(const char* path, size_t len) {
   uint32_t hash = 5381;
   for (size_t i = 0; i < len && i < 32; i++) {
-    hash = ((hash << 5) + hash) + path[i];
+    hash = ((hash << 5) + hash) + (uint8_t)path[i];
   }
-  return hash;
+  return hash & 0xFF;
+}
+
+/* Hash for method + path combination */
+static uint32_t hash_method_path(const char* method, size_t method_len,
+                                 const char* path, size_t path_len) {
+  uint32_t hash = 5381;
+  for (size_t i = 0; i < method_len && i < 7; i++) {
+    char c = method[i];
+    if (c >= 'a' && c <= 'z') c = c - 32;
+    hash = ((hash << 5) + hash) + (uint8_t)c;
+  }
+  for (size_t i = 0; i < path_len && i < 48; i++) {
+    hash = ((hash << 5) + hash) + (uint8_t)path[i];
+  }
+  return (hash ^ (hash >> 16)) & 0xFF;
+}
+
+/* Add route to hash table */
+static void add_route_to_hash(fast_route_t* route) {
+  uint32_t h = hash_method_path(route->method, strlen(route->method),
+                                route->path, strlen(route->path));
+  router.hash_table[h] = route;
 }
 
 /* Case-insensitive string compare */
@@ -63,15 +89,12 @@ int fast_router_register(const char* method, const char* path,
 
   fast_route_t* route = &router.routes[router.route_count];
 
-  /* Store method (uppercase) */
   strncpy(route->method, method, 7);
   route->method[7] = '\0';
 
-  /* Store path */
   strncpy(route->path, path, MAX_PATH_LEN - 1);
   route->path[MAX_PATH_LEN - 1] = '\0';
 
-  /* Store response */
   route->type = type;
   route->status_code = status;
   strncpy(route->content_type, content_type, 63);
@@ -84,8 +107,68 @@ int fast_router_register(const char* method, const char* path,
     route->response_len = 0;
   }
 
+  /* Build pre-formatted HTTP response */
+  uint8_t* out = route->full_response;
+  char* p = (char*)out;
+
+  /* HTTP/1.1 status line */
+  if (status == 200) {
+    memcpy(p, "HTTP/1.1 200 OK\r\n", 16);
+    p += 16;
+  } else if (status == 404) {
+    memcpy(p, "HTTP/1.1 404 Not Found\r\n", 24);
+    p += 24;
+  } else {
+    memcpy(p, "HTTP/1.1 200 OK\r\n", 16);
+    p += 16;
+  }
+
+  /* Content-Length */
+  memcpy(p, "Content-Length: ", 16);
+  p += 16;
+  char numbuf[16];
+  size_t numlen = 0;
+  size_t rlen = response_len;
+  if (rlen == 0) {
+    numbuf[numlen++] = '0';
+  } else {
+    while (rlen > 0) {
+      numbuf[numlen++] = '0' + (rlen % 10);
+      rlen /= 10;
+    }
+    while (numlen > 0) *p++ = numbuf[--numlen];
+  }
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Content-Type */
+  memcpy(p, "Content-Type: ", 14);
+  p += 14;
+  size_t ctlen = strlen(content_type);
+  memcpy(p, content_type, ctlen);
+  p += ctlen;
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Connection: keep-alive */
+  memcpy(p, "Connection: keep-alive\r\n", 23);
+  p += 23;
+
+  /* End headers */
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Body */
+  if (response_len > 0 && response != NULL) {
+    memcpy(p, response, response_len);
+    p += response_len;
+  }
+
+  route->full_response_len = p - (char*)out;
   route->active = true;
   router.route_count++;
+
+  add_route_to_hash(route);
 
   return 0;
 }
@@ -110,78 +193,26 @@ int fast_router_try_handle(const char* method, size_t method_len,
                            const char* path, size_t path_len,
                            uint8_t** response_out, size_t* response_len_out,
                            uint16_t* status_out) {
-  /* Fast path - only handle exact matches on known paths */
   if (method_len < 1 || method_len > 7) {
     router.slow_falls++;
-    return 1; /* Needs JavaScript */
+    return 1;
   }
 
-  /* Case-insensitive method first char check for speed */
-  char method_upper = method[0] >= 'a' ? method[0] - 32 : method[0];
+  uint32_t h = hash_method_path(method, method_len, path, path_len);
+  fast_route_t* route = router.hash_table[h];
 
-  /* Direct O(1) matches for most common paths */
-  if (path_len == 1 && path[0] == '/') {
-    /* Match GET / */
-    for (int i = 0; i < router.route_count; i++) {
-      fast_route_t* route = &router.routes[i];
-      if (!route->active) continue;
-      if (route->path[0] != '/' || route->path[1] != '\0') continue;
-
-      char route_method =
-          route->method[0] >= 'a' ? route->method[0] - 32 : route->method[0];
-      if (route_method != method_upper) continue;
-
+  if (route && route->active) {
+    if (strncasecmp_custom(method, route->method, 7) == 0) {
       *response_out = route->response;
       *response_len_out = route->response_len;
       *status_out = route->status_code;
       router.fast_hits++;
       return 0;
-    }
-  }
-
-  /* Match /health */
-  if (path_len == 7 && memcmp(path, "/health", 7) == 0) {
-    for (int i = 0; i < router.route_count; i++) {
-      fast_route_t* route = &router.routes[i];
-      if (!route->active) continue;
-      if (route->path[0] != '/' || strcmp(route->path + 1, "health") != 0)
-        continue;
-
-      char route_method =
-          route->method[0] >= 'a' ? route->method[0] - 32 : route->method[0];
-      if (route_method != method_upper) continue;
-
-      *response_out = route->response;
-      *response_len_out = route->response_len;
-      *status_out = route->status_code;
-      router.fast_hits++;
-      return 0;
-    }
-  }
-
-  /* Hash-based lookup for remaining routes */
-  for (int i = 0; i < router.route_count; i++) {
-    fast_route_t* route = &router.routes[i];
-    if (!route->active) continue;
-
-    char route_method =
-        route->method[0] >= 'a' ? route->method[0] - 32 : route->method[0];
-    if (route_method != method_upper) continue;
-
-    size_t route_path_len = strlen(route->path);
-    if (route_path_len != path_len) continue;
-
-    if (memcmp(route->path, path, path_len) == 0) {
-      *response_out = route->response;
-      *response_len_out = route->response_len;
-      *status_out = route->status_code;
-      router.fast_hits++;
-      return 0; /* Handled in C */
     }
   }
 
   router.slow_falls++;
-  return 1; /* Needs JavaScript */
+  return 1;
 }
 
 /* Get stats */
@@ -190,13 +221,61 @@ void fast_router_get_stats(uint64_t* fast_hits, uint64_t* slow_falls) {
   if (slow_falls) *slow_falls = router.slow_falls;
 }
 
-/* Pre-register common routes - DISABLED to avoid conflicts with JS routes
- * Users can register fast routes explicitly via the binding */
+/* Full response lookup - returns pre-built HTTP response */
+int fast_router_try_handle_full(const char* method, size_t method_len,
+                                const char* path, size_t path_len,
+                                uint8_t** response_out,
+                                size_t* response_len_out) {
+  if (method_len < 1 || method_len > 7) {
+    router.slow_falls++;
+    return 1;
+  }
+
+  uint32_t h = hash_method_path(method, method_len, path, path_len);
+  fast_route_t* route = router.hash_table[h];
+
+  if (route && route->active) {
+    if (strncasecmp_custom(method, route->method, 7) == 0) {
+      if (route->type == ROUTE_TYPE_STATIC_FILE && route->file_path[0]) {
+        router.fast_hits++;
+        return 2;
+      }
+      *response_out = route->full_response;
+      *response_len_out = route->full_response_len;
+      router.fast_hits++;
+      return 0;
+    }
+  }
+
+  router.slow_falls++;
+  return 1;
+}
+
+/* Get file path for static file route */
+const char* fast_router_get_file_path(const char* method, size_t method_len,
+                                      const char* path, size_t path_len) {
+  uint32_t h = hash_method_path(method, method_len, path, path_len);
+  fast_route_t* route = router.hash_table[h];
+
+  if (route && route->active && route->type == ROUTE_TYPE_STATIC_FILE) {
+    if (strncasecmp_custom(method, route->method, 7) == 0) {
+      return route->file_path;
+    }
+  }
+  return NULL;
+}
+
+/* Pre-register common routes for zero-JS fast path */
 void fast_router_register_defaults(void) {
   fast_router_init();
 
-  /* Fast router is currently disabled by default
-   * To enable fast routes, register them explicitly:
-   * fast_router_register("GET", "/static-path", ...)
-   */
+  /* Register common health and ping endpoints at C level for maximum
+   * performance */
+  fast_router_register("GET", "/health", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"status\":\"ok\"}", 15);
+  fast_router_register("GET", "/ping", ROUTE_TYPE_STATIC_TEXT, 200,
+                       "text/plain", (uint8_t*)"pong", 4);
+  fast_router_register("GET", "/", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"message\":\"ok\"}",
+                       15);
 }

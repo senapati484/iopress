@@ -18,7 +18,9 @@
     "binding.gyp",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "benchmarks/",
+    "benchmark/"
   ],
   "scripts": {
     "build": "node-gyp rebuild",
@@ -26,8 +28,11 @@
     "configure": "node-gyp configure",
     "clean": "node-gyp clean",
     "test": "node --pending-deprecation --test",
-    "bench": "bash benchmark/run.sh",
-    "bench:ci": "node benchmark/regression.js",
+    "bench": "node benchmarks/run.js",
+    "bench:compare": "node benchmarks/run.js --compare",
+    "bench:ci": "node benchmarks/run.js --ci",
+    "bench:full": "node benchmarks/run.js --full",
+    "bench:quick": "node benchmarks/run.js --scenario hello-world",
     "docs": "typedoc --config typedoc.json"
   },
   "keywords": [

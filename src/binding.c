@@ -209,22 +209,14 @@ static int on_request_c_handler(connection_t* conn,
   /* Try fast router first (C-only, no JavaScript) */
   uint8_t* fast_response = NULL;
   size_t fast_response_len = 0;
-  uint16_t fast_status = 200;
 
-  int fast_result =
-      fast_router_try_handle((const char*)result->method, result->method_len,
-                             (const char*)result->path, result->path_len,
-                             &fast_response, &fast_response_len, &fast_status);
+  int fast_result = fast_router_try_handle_full(
+      (const char*)result->method, result->method_len,
+      (const char*)result->path, result->path_len, &fast_response,
+      &fast_response_len);
 
-  if (fast_result == 0) {
-    /* Handled in C! No JavaScript crossing */
-    response_t resp = {0};
-    resp.status_code = fast_status;
-    resp.body = fast_response;
-    resp.body_len = fast_response_len;
-    resp.is_last = 1;
-
-    server_send_response(g_context.server, conn, &resp);
+  if (fast_result == 0 && fast_response_len > 0) {
+    write(conn->fd, fast_response, fast_response_len);
     return 0;
   }
 

@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "fast_router.h"
+#include "http2.h"
 #include "parser.h"
 #include "server.h"
 
@@ -201,6 +203,18 @@ static int set_nodelay(int fd) {
   return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 }
 
+static void tune_socket(int fd) {
+  set_nodelay(fd);
+
+  int sndbuf = 262144;
+  int rcvbuf = 262144;
+  setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+  setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+
+  int keepalive = 1;
+  setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
+}
+
 /* ============================================================================
  * Connection Pool
  * ============================================================================
@@ -289,8 +303,37 @@ static void close_connection(kevent_context_t* ctx, int fd) {
  * ============================================================================
  */
 
-static char* fast_itoa(uint16_t val, char* buf) {
-  char tmp[8];
+/* Pre-computed response templates for zero-allocation fast path */
+static const uint8_t RESPONSE_200_JSON_EMPTY[] =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 2\r\n"
+    "Connection: keep-alive\r\n"
+    "Content-Type: application/json\r\n"
+    "\r\n"
+    "{}";
+
+static const uint8_t RESPONSE_200_PING[] =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 4\r\n"
+    "Connection: keep-alive\r\n"
+    "Content-Type: text/plain\r\n"
+    "\r\n"
+    "pong";
+
+static const uint8_t RESPONSE_404[] =
+    "HTTP/1.1 404 Not Found\r\n"
+    "Content-Length: 9\r\n"
+    "Connection: close\r\n"
+    "\r\n"
+    "Not Found";
+
+static const size_t RESPONSE_200_JSON_EMPTY_LEN =
+    sizeof(RESPONSE_200_JSON_EMPTY) - 1;
+static const size_t RESPONSE_200_PING_LEN = sizeof(RESPONSE_200_PING) - 1;
+static const size_t RESPONSE_404_LEN = sizeof(RESPONSE_404) - 1;
+
+static char* fast_itoa_size(size_t val, char* buf) {
+  char tmp[16];
   int i = 0;
   if (val == 0) {
     buf[0] = '0';
@@ -308,27 +351,16 @@ static char* fast_itoa(uint16_t val, char* buf) {
   return buf;
 }
 
+static char* fast_itoa(uint16_t val, char* buf) {
+  return fast_itoa_size((size_t)val, buf);
+}
+
 static int format_http_response_fast(int status_code, const uint8_t* body,
                                      size_t body_len, uint8_t* out,
                                      size_t out_cap, size_t* out_len) {
-  (void)out_cap; /* Unused - static buffer */
+  (void)out_cap;
 
-  /* Copy common status line */
-  const char* status_text = "OK";
-  if (status_code == 201)
-    status_text = "Created";
-  else if (status_code == 400)
-    status_text = "Bad Request";
-  else if (status_code == 404)
-    status_text = "Not Found";
-  else if (status_code == 413)
-    status_text = "Payload Too Large";
-  else if (status_code == 500)
-    status_text = "Internal Server Error";
-  else if (status_code != 200)
-    status_text = "Unknown";
-
-  /* Fast status line */
+  /* Fast status line - optimized for common cases */
   out[0] = 'H';
   out[1] = 'T';
   out[2] = 'T';
@@ -339,18 +371,87 @@ static int format_http_response_fast(int status_code, const uint8_t* body,
   out[7] = '1';
   out[8] = ' ';
   char* p = (char*)out + 9;
-  fast_itoa(status_code, p);
-  while (*p) p++;
-  *p++ = ' ';
-  const char* sp = status_text;
-  while (*sp) *p++ = *sp++;
+
+  if (status_code == 200) {
+    p[0] = '2';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'O';
+    p[5] = 'K';
+    p += 6;
+  } else if (status_code == 404) {
+    p[0] = '4';
+    p[1] = '0';
+    p[2] = '4';
+    p[3] = ' ';
+    p[4] = 'N';
+    p[5] = 'o';
+    p[6] = 't';
+    p[7] = ' ';
+    p[8] = 'F';
+    p[9] = 'o';
+    p[10] = 'u';
+    p[11] = 'n';
+    p[12] = 'd';
+    p += 13;
+  } else if (status_code == 400) {
+    p[0] = '4';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'B';
+    p[5] = 'a';
+    p[6] = 'd';
+    p[7] = ' ';
+    p[8] = 'R';
+    p[9] = 'e';
+    p[10] = 'q';
+    p[11] = 'u';
+    p[12] = 'e';
+    p[13] = 's';
+    p[14] = 't';
+    p += 15;
+  } else if (status_code == 500) {
+    p[0] = '5';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'I';
+    p[5] = 'n';
+    p[6] = 't';
+    p[7] = 'e';
+    p[8] = 'r';
+    p[9] = 'n';
+    p[10] = 'a';
+    p[11] = 'l';
+    p[12] = ' ';
+    p[13] = 'S';
+    p[14] = 'e';
+    p[15] = 'r';
+    p[16] = 'v';
+    p[17] = 'e';
+    p[18] = 'r';
+    p[19] = ' ';
+    p[20] = 'E';
+    p[21] = 'r';
+    p[22] = 'r';
+    p[23] = 'o';
+    p[24] = 'r';
+    p += 25;
+  } else {
+    fast_itoa(status_code, p);
+    while (*p) p++;
+    *p++ = ' ';
+    const char* sp = "OK";
+    while (*sp) *p++ = *sp++;
+  }
+
+  /* Content-Length header */
   *p++ = '\r';
   *p++ = '\n';
-
-  /* Content-Length */
   const char* cl = "Content-Length: ";
-  const char* c = cl;
-  while (*c) *p++ = *c++;
+  while (*cl) *p++ = *cl++;
   fast_itoa((uint16_t)body_len, p);
   while (*p) p++;
   *p++ = '\r';
@@ -362,7 +463,7 @@ static int format_http_response_fast(int status_code, const uint8_t* body,
 
   /* Body */
   if (body_len > 0 && body != NULL) {
-    memcpy((char*)p, body, body_len);
+    memcpy(p, body, body_len);
     p += body_len;
   }
 
@@ -587,6 +688,55 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
       conn->body_remaining = result.body_length;
       conn->request_complete = true;
 
+      /* FAST PATH: Try fast router before JS callback - use pre-built response
+       */
+      uint8_t* fast_response = NULL;
+      size_t fast_response_len = 0;
+
+      int fast_handled = fast_router_try_handle_full(
+          result.method, strlen(result.method), result.path,
+          strlen(result.path), &fast_response, &fast_response_len);
+
+      if (fast_handled == 0 && fast_response != NULL && fast_response_len > 0) {
+        /* Ultra fast path - write pre-built response directly */
+        write(fd, fast_response, fast_response_len);
+
+        requests_processed++;
+
+        /* Handle keep-alive */
+        size_t consumed = result.bytes_consumed;
+        if (result.body_present && conn->assembled_body) {
+          const char* body_start =
+              (const char*)conn->buffer + result.body_start;
+          size_t body_len = conn->buffer_len - result.body_start;
+          const char* term = memmem(body_start, body_len, "0\r\n\r\n", 5);
+          if (term) {
+            consumed = result.body_start + (term - body_start) + 5;
+          }
+        } else if (result.body_present && result.body_length > 0) {
+          consumed = result.body_start + result.body_length;
+        }
+
+        /* Remove processed request from buffer */
+        if (consumed < conn->buffer_len) {
+          memmove(conn->buffer, conn->buffer + consumed,
+                  conn->buffer_len - consumed);
+          conn->buffer_len -= consumed;
+          conn->buffer_pos = 0;
+        } else {
+          conn->buffer_len = 0;
+        }
+
+        /* Handle keep-alive for HTTP/1.1 */
+        bool keep_alive = (result.http_minor >= 1);
+
+        if (!keep_alive) {
+          close_connection(ctx, fd);
+          return;
+        }
+        continue;
+      }
+
       /* Call JS callback (threadsafe) */
       if (ctx->on_request) {
         ctx->on_request(conn, &result, ctx->user_data);
@@ -657,9 +807,9 @@ static void* event_loop_thread(void* arg) {
       struct kevent* ev = &events[i];
 
       if ((int)ev->ident == ctx->listen_fd) {
-        /* New connection - accept all pending */
+        /* New connection - accept all pending with edge-triggered efficiency */
         int accepted = 0;
-        while (accepted < 64) {
+        while (accepted < 128) { /* Increased from 64 */
           struct sockaddr_in client_addr;
           socklen_t addr_len = sizeof(client_addr);
           int client_fd =
@@ -667,7 +817,7 @@ static void* event_loop_thread(void* arg) {
           if (client_fd < 0) break;
 
           set_nonblocking(client_fd);
-          set_nodelay(client_fd);
+          tune_socket(client_fd);
 
           connection_t* conn =
               get_connection(ctx->connections, ctx->max_connections, client_fd);
@@ -675,7 +825,8 @@ static void* event_loop_thread(void* arg) {
             if (ctx->on_connection) ctx->on_connection(conn, 0, ctx->user_data);
 
             struct kevent new_ev;
-            EV_SET(&new_ev, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0,
+            /* EV_CLEAR = edge-triggered for better performance */
+            EV_SET(&new_ev, client_fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0,
                    conn);
             kevent(ctx->kq, &new_ev, 1, NULL, 0, NULL);
           } else {

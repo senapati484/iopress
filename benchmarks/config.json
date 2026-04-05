@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "name": "@iopress/core-benchmark",
+  "description": "Configurable benchmark harness for @iopress/core performance testing",
+
+  "targets": {
+    "linux": {
+      "backend": "io_uring",
+      "minRps": 300000,
+      "targetRps": 500000,
+      "maxLatencyP99": 2
+    },
+    "macos": {
+      "backend": "kqueue",
+      "minRps": 80000,
+      "targetRps": 150000,
+      "maxLatencyP99": 5
+    },
+    "windows": {
+      "backend": "iocp",
+      "minRps": 50000,
+      "targetRps": 100000,
+      "maxLatencyP99": 8
+    },
+    "express": {
+      "baseline": true,
+      "expectedRps": 20000,
+      "maxLatencyP99": 50
+    }
+  },
+
+  "workload": {
+    "warmupDuration": 5,
+    "testDuration": 10,
+    "connections": 100,
+    "pipelining": 1,
+    "method": "GET",
+    "path": "/health",
+    "body": null,
+    "headers": {}
+  },
+
+  "scenarios": [
+    {
+      "name": "hello-world",
+      "path": "/",
+      "description": "Simple JSON response"
+    },
+    {
+      "name": "health-check",
+      "path": "/health",
+      "description": "Health endpoint"
+    },
+    {
+      "name": "route-params",
+      "path": "/users/123",
+      "description": "Route with parameter extraction"
+    },
+    {
+      "name": "json-body",
+      "method": "POST",
+      "path": "/echo",
+      "body": "{\"test\":\"data\"}",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "description": "POST with JSON body"
+    },
+    {
+      "name": "query-params",
+      "path": "/search?q=test&page=1",
+      "description": "Request with query string"
+    }
+  ],
+
+  "environment": {
+    "nodeVersion": ">=18.0.0",
+    "platforms": ["linux", "darwin", "win32"],
+    "cpuPinning": false,
+    "isolateNetwork": false
+  },
+
+  "reporting": {
+    "outputFormat": "json",
+    "outputDir": "./benchmarks/results",
+    "includeSystemInfo": true,
+    "includeRegressionCheck": true
+  }
+}

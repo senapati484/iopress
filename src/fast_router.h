@@ -18,12 +18,14 @@
 #define MAX_FAST_ROUTES 64
 #define MAX_PATH_LEN 128
 #define MAX_RESPONSE_LEN 4096
+#define MAX_FULL_RESPONSE 8192
 
 /* Route types */
 typedef enum {
-  ROUTE_TYPE_STATIC_JSON, /* Static JSON response */
-  ROUTE_TYPE_STATIC_TEXT, /* Static text response */
-  ROUTE_TYPE_DYNAMIC      /* Requires JavaScript handler */
+  ROUTE_TYPE_STATIC_JSON,
+  ROUTE_TYPE_STATIC_TEXT,
+  ROUTE_TYPE_STATIC_FILE,
+  ROUTE_TYPE_DYNAMIC
 } route_type_t;
 
 /* Fast route entry */
@@ -35,6 +37,9 @@ typedef struct {
   char content_type[64];
   uint8_t response[MAX_RESPONSE_LEN];
   size_t response_len;
+  uint8_t full_response[MAX_FULL_RESPONSE];
+  size_t full_response_len;
+  char file_path[256];
   bool active;
 } fast_route_t;
 
@@ -44,28 +49,31 @@ typedef struct {
   int route_count;
   uint64_t fast_hits;
   uint64_t slow_falls;
+  fast_route_t* hash_table[256];
 } fast_router_t;
 
-/* Initialize router */
 void fast_router_init(void);
 
-/* Register a fast route */
 int fast_router_register(const char* method, const char* path,
                          route_type_t type, uint16_t status,
                          const char* content_type, const uint8_t* response,
                          size_t response_len);
 
-/* Try to handle request in fast path */
-/* Returns: 0 = handled, 1 = needs JavaScript, -1 = error */
 int fast_router_try_handle(const char* method, size_t method_len,
                            const char* path, size_t path_len,
                            uint8_t** response_out, size_t* response_len_out,
                            uint16_t* status_out);
 
-/* Get stats */
+int fast_router_try_handle_full(const char* method, size_t method_len,
+                                const char* path, size_t path_len,
+                                uint8_t** response_out,
+                                size_t* response_len_out);
+
+const char* fast_router_get_file_path(const char* method, size_t method_len,
+                                      const char* path, size_t path_len);
+
 void fast_router_get_stats(uint64_t* fast_hits, uint64_t* slow_falls);
 
-/* Pre-register common routes */
 void fast_router_register_defaults(void);
 
 #endif /* FAST_ROUTER_H */
