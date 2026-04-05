@@ -220,6 +220,11 @@ static int on_request_c_handler(connection_t* conn,
     return 0;
   }
 
+  if (fast_result == 0 && fast_response_len > 0) {
+    write(conn->fd, fast_response, fast_response_len);
+    return 0;
+  }
+
   /* Standard path: Allocate and pass to JS */
   request_data_t* req_data = calloc(1, sizeof(request_data_t));
   if (!req_data) return -1;
@@ -522,8 +527,12 @@ napi_value RegisterFastRoute(napi_env env, napi_callback_info info) {
                              &response_len);
 
   /* Register with fast router */
-  fast_router_register(method, path, ROUTE_TYPE_STATIC_JSON, status,
-                       "application/json", (uint8_t*)response, response_len);
+  int reg_result = fast_router_register(method, path, ROUTE_TYPE_STATIC_JSON,
+                                        status, "application/json",
+                                        (uint8_t*)response, response_len);
+
+  fprintf(stderr, "RegisterFastRoute: %s %s -> result=%d\n", method, path,
+          reg_result);
 
   napi_value result;
   napi_get_undefined(env, &result);

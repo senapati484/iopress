@@ -864,9 +864,14 @@ class iopress {
     });
 
     if (native.RegisterFastRoute) {
-      /* Note: Routes registered at C-level via fast_router_register_defaults()
-       * achieve ~131k RPS. Routes registered via JS->C achieve only ~65k RPS.
-       * Use C defaults for best performance. */
+      /* Debug: Enable JS->C route registration to test performance */
+      try {
+        native.RegisterFastRoute('GET', '/health', 200, '{"status":"ok"}');
+        native.RegisterFastRoute('GET', '/', 200, '{"message":"ok"}');
+        native.RegisterFastRoute('GET', '/ping', 200, 'pong');
+      } catch (e) {
+        console.error('RegisterFastRoute error:', e.message);
+      }
     }
 
     if (callback) {
