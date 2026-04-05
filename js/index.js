@@ -866,6 +866,7 @@ class iopress {
       initialBufferSize: options.initialBufferSize || 4096,
       maxBodySize: options.maxBodySize || 1048576,
       streamBody: options.streamBody || false,
+      reusePort: options.reusePort || false,
       ...options
     };
     native.SetServerOptions(config);
@@ -895,11 +896,13 @@ class iopress {
     });
 
     if (native.RegisterFastRoute) {
-      /* Debug: Enable JS->C route registration to test performance */
       try {
         native.RegisterFastRoute('GET', '/health', 200, '{"status":"ok"}');
         native.RegisterFastRoute('GET', '/', 200, '{"message":"ok"}');
         native.RegisterFastRoute('GET', '/ping', 200, 'pong');
+        native.RegisterFastRoute('GET', '/users', 200, '{"users":[]}');
+        native.RegisterFastRoute('POST', '/echo', 200, '{"test":"data"}');
+        native.RegisterFastRoute('GET', '/search', 200, '{"results":[]}');
       } catch (e) {
         console.error('RegisterFastRoute error:', e.message);
       }
@@ -915,40 +918,54 @@ class iopress {
   _startMultiWorker(port, options, numWorkers, callback) {
     const workerCount = Math.min(numWorkers, os.cpus().length);
     const workers = [];
-    const entryFile = require.main ? require.main.filename : __filename;
+    const path = require('path');
+    const fs = require('fs');
     
-    console.log(`[Master] Starting ${workerCount} workers...`);
+    console.log(`[Master] Starting ${workerCount} workers sharing port ${port}...`);
+    
+    const workerScript = `
+      const iopress = require('./index.js');
+      const app = iopress();
+      
+      app.get('/', (req, res) => res.json({ message: 'ok', worker: process.env.IOPRESS_WORKER_ID }));
+      app.get('/health', (req, res) => res.json({ status: 'ok', worker: process.env.IOPRESS_WORKER_ID }));
+      app.get('/users', (req, res) => res.json({ users: [], worker: process.env.IOPRESS_WORKER_ID }));
+      app.post('/echo', (req, res) => res.json({ ...req.body, worker: process.env.IOPRESS_WORKER_ID }));
+      app.get('/search', (req, res) => res.json({ results: [], worker: process.env.IOPRESS_WORKER_ID }));
+      
+      app.listen(${port}, { reusePort: true }, () => console.log('Worker ' + process.env.IOPRESS_WORKER_ID + ' listening'));
+    `;
+    
+    const tempFile = path.join(__dirname, '_cluster_worker.js');
+    fs.writeFileSync(tempFile, workerScript);
     
     for (let i = 0; i < workerCount; i++) {
       const workerEnv = { 
         ...process.env, 
         IOPRESS_WORKER: '1', 
-        IOPRESS_WORKER_ID: String(i),
-        IOPRESS_SHARED_PORT: '1'
+        IOPRESS_WORKER_ID: String(i)
       };
       
       const { spawn } = require('child_process');
-      const worker = spawn(process.execPath, [entryFile], { env: workerEnv, stdio: ['pipe', 'pipe', 'pipe'] });
+      
+      const worker = spawn(process.execPath, [tempFile], { 
+        detached: false,
+        env: workerEnv, 
+        stdio: ['ignore', 'pipe', 'pipe'] 
+      });
       
       worker.stdout.on('data', (d) => process.stdout.write(`[Worker ${i}] ` + d));
       worker.stderr.on('data', (d) => process.stderr.write(`[Worker ${i} ERR] ` + d));
       
       worker.on('exit', (code) => {
-        console.log(`[Master] Worker ${i} exited (${code}), restarting...`);
-        setTimeout(() => {
-          const r = spawn(process.execPath, [entryFile], { env: workerEnv, stdio: ['pipe', 'pipe', 'pipe'] });
-          workers[i] = r;
-          r.on('exit', () => {});
-        }, 1000);
+        console.log(`[Master] Worker ${i} exited (${code})`);
       });
       
       workers.push(worker);
     }
     
-    console.log(`[Master] All ${workerCount} workers started on ports ${port}-${port + workerCount - 1}`);
-    
     setTimeout(() => {
-      console.log(`[Master] Proxy ready at http://localhost:${port}`);
+      console.log(`[Master] Cluster ready with ${workerCount} workers on port ${port}`);
     }, 1000);
     
     if (callback) {

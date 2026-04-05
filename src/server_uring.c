@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "fast_router.h"
 #include "parser.h"
 
 /* ============================================================================
@@ -31,8 +32,10 @@
  * ============================================================================
  */
 
-#define QUEUE_DEPTH 256
-#define BATCH_SIZE 32
+#define QUEUE_DEPTH 1024
+#define BATCH_SIZE 256
+#define MAX_PIPELINE_BATCH 64
+#define MAX_ACCEPT_BATCH 512
 
 /* ============================================================================
  * Platform Context
@@ -88,6 +91,20 @@ static int set_reuseaddr(int fd) {
 static int set_nodelay(int fd) {
   int opt = 1;
   return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+}
+
+static int set_socket_options(int fd) {
+  set_nodelay(fd);
+
+  int sndbuf = 1048576;
+  int rcvbuf = 1048576;
+  setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+  setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+
+  int keepalive = 1;
+  setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
+
+  return 0;
 }
 
 /* ============================================================================
@@ -207,35 +224,41 @@ static void arm_recv(uring_context_t* ctx, connection_t* conn) {
  */
 
 static void handle_new_connection(uring_context_t* ctx) {
-  struct sockaddr_in client_addr;
-  socklen_t addr_len = sizeof(client_addr);
+  int accepted = 0;
 
-  int client_fd =
-      accept(ctx->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
-  if (client_fd < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) return;
-    return;
+  while (accepted < MAX_ACCEPT_BATCH) {
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+
+    int client_fd =
+        accept(ctx->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
+    if (client_fd < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+      break;
+    }
+
+    if (set_nonblocking(client_fd) < 0) {
+      close(client_fd);
+      continue;
+    }
+
+    set_socket_options(client_fd);
+
+    connection_t* conn =
+        get_connection(ctx->connections, ctx->max_connections, client_fd);
+    if (conn == NULL) {
+      close(client_fd);
+      continue;
+    }
+
+    if (ctx->on_connection) {
+      ctx->on_connection(conn, 0, ctx->user_data);
+    }
+
+    arm_recv(ctx, conn);
+    accepted++;
   }
 
-  if (set_nonblocking(client_fd) < 0) {
-    close(client_fd);
-    return;
-  }
-
-  set_nodelay(client_fd);
-
-  connection_t* conn =
-      get_connection(ctx->connections, ctx->max_connections, client_fd);
-  if (conn == NULL) {
-    close(client_fd);
-    return;
-  }
-
-  if (ctx->on_connection) {
-    ctx->on_connection(conn, 0, ctx->user_data);
-  }
-
-  arm_recv(ctx, conn);
   arm_accept(ctx);
 }
 

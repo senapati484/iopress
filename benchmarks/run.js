@@ -198,7 +198,7 @@ class BenchmarkHarness {
         method,
         duration,
         connections,
-        pipelining: 1,
+        pipelining: this.config.workload.pipelining || 1,
         headers: scenario.headers || {},
         body: scenario.body,
         requests: [{

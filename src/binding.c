@@ -73,34 +73,93 @@ typedef struct {
  * ============================================================================
  */
 
+#define MAX_CACHED_ROUTES 64
+
 typedef struct {
+  char method[8];
   char path[128];
   uint8_t response[MAX_CACHE_RESPONSE_SIZE];
   size_t response_len;
   uint16_t status_code;
   int hit_count;
   int active;
-} fast_path_cache_t;
+} cached_route_t;
 
-static fast_path_cache_t fast_cache[MAX_CACHED_PATHS];
+static cached_route_t route_cache[MAX_CACHED_ROUTES];
 static int cache_initialized = 0;
+static int cache_hits = 0;
+static int cache_misses = 0;
 
-static void init_fast_cache(void) {
+static void init_route_cache(void) {
   if (cache_initialized) return;
 
-  // Pre-populate common endpoints
-  const char* health_path = "/health";
-  const char* health_response = "{\"status\":\"ok\"}";
-  size_t health_len = strlen(health_response);
-
-  strncpy(fast_cache[0].path, health_path, 127);
-  memcpy(fast_cache[0].response, health_response, health_len);
-  fast_cache[0].response_len = health_len;
-  fast_cache[0].status_code = 200;
-  fast_cache[0].hit_count = 0;
-  fast_cache[0].active = 1;
-
+  memset(route_cache, 0, sizeof(route_cache));
   cache_initialized = 1;
+  cache_hits = 0;
+  cache_misses = 0;
+}
+
+static cached_route_t* find_cached_route(const char* method, const char* path) {
+  if (!cache_initialized) init_route_cache();
+
+  for (int i = 0; i < MAX_CACHED_ROUTES; i++) {
+    if (!route_cache[i].active) continue;
+
+    if (strcmp(route_cache[i].method, method) == 0 &&
+        strcmp(route_cache[i].path, path) == 0) {
+      route_cache[i].hit_count++;
+      cache_hits++;
+      return &route_cache[i];
+    }
+  }
+  cache_misses++;
+  return NULL;
+}
+
+static void add_cached_route(const char* method, const char* path,
+                             const uint8_t* response, size_t response_len,
+                             uint16_t status_code) {
+  if (!cache_initialized) init_route_cache();
+
+  /* Find empty slot */
+  for (int i = 0; i < MAX_CACHED_ROUTES; i++) {
+    if (!route_cache[i].active) {
+      strncpy(route_cache[i].method, method, 7);
+      strncpy(route_cache[i].path, path, 127);
+      if (response_len < MAX_CACHE_RESPONSE_SIZE) {
+        memcpy(route_cache[i].response, response, response_len);
+      }
+      route_cache[i].response_len = response_len;
+      route_cache[i].status_code = status_code;
+      route_cache[i].active = 1;
+      route_cache[i].hit_count = 0;
+      return;
+    }
+  }
+
+  /* Cache full - replace least used (simple LRU) */
+  int min_hits = route_cache[0].hit_count;
+  int min_idx = 0;
+  for (int i = 1; i < MAX_CACHED_ROUTES; i++) {
+    if (route_cache[i].hit_count < min_hits) {
+      min_hits = route_cache[i].hit_count;
+      min_idx = i;
+    }
+  }
+
+  strncpy(route_cache[min_idx].method, method, 7);
+  strncpy(route_cache[min_idx].path, path, 127);
+  if (response_len < MAX_CACHE_RESPONSE_SIZE) {
+    memcpy(route_cache[min_idx].response, response, response_len);
+  }
+  route_cache[min_idx].response_len = response_len;
+  route_cache[min_idx].status_code = status_code;
+  route_cache[min_idx].hit_count = 0;
+}
+
+static void get_cache_stats(int* hits, int* misses) {
+  if (hits) *hits = cache_hits;
+  if (misses) *misses = cache_misses;
 }
 
 /* ============================================================================
@@ -171,32 +230,6 @@ static int parse_headers(const uint8_t* buffer, size_t len, char keys[][64],
   return count;
 }
 
-/* Reserved for future caching implementation - kept for API compatibility */
-#if defined(__APPLE__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-function"
-#endif
-
-static fast_path_cache_t* find_in_cache(const char* path, size_t path_len) {
-  if (!cache_initialized) init_fast_cache();
-
-  for (int i = 0; i < MAX_CACHED_PATHS; i++) {
-    if (!fast_cache[i].active) continue;
-
-    if (strncmp(fast_cache[i].path, path, path_len) == 0 &&
-        fast_cache[i].path[path_len] == '\0') {
-      fast_cache[i].hit_count++;
-      return &fast_cache[i];
-    }
-  }
-
-  return NULL;
-}
-
-#if defined(__APPLE__)
-#pragma clang diagnostic pop
-#endif
-
 /* ============================================================================
  * C Request Handler (Called from server thread)
  * ============================================================================
@@ -214,11 +247,6 @@ static int on_request_c_handler(connection_t* conn,
       (const char*)result->method, result->method_len,
       (const char*)result->path, result->path_len, &fast_response,
       &fast_response_len);
-
-  if (fast_result == 0 && fast_response_len > 0) {
-    write(conn->fd, fast_response, fast_response_len);
-    return 0;
-  }
 
   if (fast_result == 0 && fast_response_len > 0) {
     write(conn->fd, fast_response, fast_response_len);
@@ -555,6 +583,7 @@ napi_value Listen(napi_env env, napi_callback_info info) {
   config.port = port;
   config.initial_buffer_size = DEFAULT_INITIAL_BUFFER_SIZE;
   config.max_body_size = DEFAULT_MAX_BODY_SIZE;
+  config.reuse_port = false;
 
   if (argc > 1) {
     napi_value options = args[1];
@@ -571,6 +600,12 @@ napi_value Listen(napi_env env, napi_callback_info info) {
       int32_t v;
       napi_get_value_int32(env, val, &v);
       config.max_body_size = v;
+    }
+
+    if (napi_get_named_property(env, options, "reusePort", &val) == napi_ok) {
+      bool v;
+      napi_get_value_bool(env, val, &v);
+      config.reuse_port = v;
     }
   }
 

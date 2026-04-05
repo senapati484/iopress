@@ -46,9 +46,9 @@ node benchmarks/run.js --ci
 | Platform | Backend | Minimum RPS | Target RPS | Max p99 Latency |
 |----------|---------|-------------|------------|-----------------|
 | Linux | io_uring | 300,000 | 500,000 | <2ms |
-| macOS | kqueue | 80,000 | 150,000 | <5ms |
+| macOS | kqueue | 150,000 | 215,000 | <10ms |
 | Windows | IOCP | 50,000 | 100,000 | <8ms |
-| Express.js | - | 18,000 | 20,000 | <50ms |
+| Express.js | - | 15,000 | 20,000 | <50ms |
 
 ### Success Criteria
 

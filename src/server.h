@@ -85,6 +85,9 @@ typedef struct {
 
   /** Backlog size for listen() */
   int backlog;
+
+  /** Enable SO_REUSEPORT for multi-process scaling */
+  bool reuse_port;
 } server_config_t;
 
 /**

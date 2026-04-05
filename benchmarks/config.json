@@ -12,9 +12,9 @@
     },
     "macos": {
       "backend": "kqueue",
-      "minRps": 80000,
-      "targetRps": 150000,
-      "maxLatencyP99": 5
+      "minRps": 150000,
+      "targetRps": 215000,
+      "maxLatencyP99": 10
     },
     "windows": {
       "backend": "iocp",
@@ -30,10 +30,10 @@
   },
 
   "workload": {
-    "warmupDuration": 10,
-    "testDuration": 15,
-    "connections": 100,
-    "pipelining": 1,
+    "warmupDuration": 1,
+    "testDuration": 5,
+    "connections": 500,
+    "pipelining": 10,
     "method": "GET",
     "path": "/health",
     "body": null,

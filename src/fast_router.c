@@ -41,7 +41,7 @@ static uint32_t hash_path(const char* path, size_t len) {
   return hash & 0xFF;
 }
 
-/* Hash for method + path combination */
+/* Hash for method + path combination - better distribution */
 static uint32_t hash_method_path(const char* method, size_t method_len,
                                  const char* path, size_t path_len) {
   uint32_t hash = 5381;
@@ -50,10 +50,14 @@ static uint32_t hash_method_path(const char* method, size_t method_len,
     if (c >= 'a' && c <= 'z') c = c - 32;
     hash = ((hash << 5) + hash) + (uint8_t)c;
   }
-  for (size_t i = 0; i < path_len && i < 48; i++) {
-    hash = ((hash << 5) + hash) + (uint8_t)path[i];
+  for (size_t i = 0; i < path_len && i < 64; i++) {
+    if (path[i] >= 'A' && path[i] <= 'Z') {
+      hash = ((hash << 5) + hash) + (path[i] + 32);
+    } else {
+      hash = ((hash << 5) + hash) + (uint8_t)path[i];
+    }
   }
-  return (hash ^ (hash >> 16)) & 0xFF;
+  return hash & 0xFF;
 }
 
 /* Add route to hash table */
@@ -193,7 +197,7 @@ int fast_router_try_handle(const char* method, size_t method_len,
                            const char* path, size_t path_len,
                            uint8_t** response_out, size_t* response_len_out,
                            uint16_t* status_out) {
-  if (method_len < 1 || method_len > 7) {
+  if (method_len < 1 || method_len > 7 || path_len < 1) {
     router.slow_falls++;
     return 1;
   }
@@ -226,7 +230,7 @@ int fast_router_try_handle_full(const char* method, size_t method_len,
                                 const char* path, size_t path_len,
                                 uint8_t** response_out,
                                 size_t* response_len_out) {
-  if (method_len < 1 || method_len > 7) {
+  if (method_len < 1 || method_len > 7 || path_len < 1) {
     router.slow_falls++;
     return 1;
   }
