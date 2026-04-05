@@ -124,7 +124,7 @@ class BenchmarkHarness {
       
       app.get('/', (req, res) => res.json({ message: 'ok' }));
       app.get('/health', (req, res) => res.json({ status: 'ok' }));
-      app.get('/users/:id', (req, res) => res.json({ id: req.params.id }));
+      app.get('/users', (req, res) => res.json({ users: [] }));
       app.post('/echo', (req, res) => res.json(req.body));
       app.get('/search', (req, res) => res.json({ results: [] }));
       

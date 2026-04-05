@@ -30,8 +30,8 @@
   },
 
   "workload": {
-    "warmupDuration": 5,
-    "testDuration": 10,
+    "warmupDuration": 10,
+    "testDuration": 15,
     "connections": 100,
     "pipelining": 1,
     "method": "GET",

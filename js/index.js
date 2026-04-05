@@ -470,69 +470,48 @@ class iopress {
     this.server = null;
     this._routeCache = new Map();
     this._cacheMaxSize = 256;
+    this.settings = {};
+    this._locals = {};
+    this.engines = {};
+    this._router = this;
+    this.cache = {};
+    this.domain = null;
   }
 
   /**
-   * Register middleware function.
+   * Set application setting (Express-compatible).
    *
-   * Middleware functions are executed in order before route handlers.
-   * Can be path-specific or global (when path is omitted).
-   *
-   * @param {string|Function} path - Path pattern or middleware function
-   * @param {...Function} handlers - Middleware handler functions
-   * @returns {iopress} Returns this for method chaining
-   * @throws {TypeError} Throws if handler is not a function
-   * @since 1.0.0
-   *
-   * @example
-   * // Global middleware
-   * app.use((req, res, next) => {
-   *   res.set('X-Request-Id', generateId());
-   *   next();
-   * });
-   *
-   * // Path-specific middleware
-   * app.use('/api', authenticateUser);
+   * @param {string} setting - Setting name
+   * @param {*} value - Setting value
+   * @returns {iopress} Returns this for chaining
    */
-  use(path, ...handlers) {
-    const hadExplicitPath = typeof path !== 'function';
-    if (typeof path === 'function') {
-      handlers.unshift(path);
-      path = '/';
-    }
-    for (const handler of handlers) {
-      if (typeof handler !== 'function') {
-        throw new TypeError('Middleware handler must be a function');
-      }
-      // isTerminal: true if this is a catch-all handler (no explicit path and doesn't call next)
-      // These should only run when no route matches
-      const isTerminal = !hadExplicitPath && path === '/';
-      this.middleware.push({ path, handler, isTerminal });
-    }
+  set(setting, value) {
+    this.settings[setting] = value;
     return this;
   }
 
   /**
-   * Register GET route handler.
+   * Get application setting or register GET route (Express-compatible).
    *
-   * @param {string} path - Route pattern (e.g., '/users/:id')
-   * @param {...Function} handlers - Route handler functions
-   * @returns {iopress} Returns this for method chaining
-   * @throws {TypeError} Throws if handler is not a function
-   * @since 1.0.0
-   *
-   * @example
-   * app.get('/users', (req, res) => {
-   *   res.json([{ id: 1, name: 'Alice' }]);
-   * });
-   *
-   * app.get('/users/:id', (req, res) => {
-   *   res.json({ id: req.params.id });
-   * });
+   * @param {string} path - Route path or setting name
+   * @param {...Function} handlers - Route handlers
+   * @returns {*}
    */
   get(path, ...handlers) {
-    this._addRoute('GET', path, handlers);
-    return this;
+    // If path starts with /, it's a route
+    if (path.startsWith('/')) {
+      this._addRoute('GET', path, handlers);
+      return this;
+    }
+    // Otherwise check settings (for app.get('setting'))
+    if (this.settings[path] !== undefined) {
+      return this.settings[path];
+    }
+    // Special case: env
+    if (path === 'env') {
+      return process.env.NODE_ENV || 'development';
+    }
+    return undefined;
   }
 
   /**
@@ -636,6 +615,58 @@ class iopress {
       throw new TypeError('Error handler must be a function');
     }
     this.errorHandler = handler;
+    return this;
+  }
+
+  /**
+   * Register route for all HTTP methods (Express-compatible).
+   *
+   * @param {string} path - Route pattern
+   * @param {...Function} handlers - Route handlers
+   * @returns {iopress} Returns this for chaining
+   */
+  all(path, ...handlers) {
+    const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+    for (const method of methods) {
+      this._addRoute(method, path, handlers);
+    }
+    return this;
+  }
+
+  /**
+   * Register param handler (Express-compatible).
+   *
+   * @param {string} name - Parameter name
+   * @param {Function} handler - Handler function
+   * @returns {iopress} Returns this for chaining
+   */
+  param(name, handler) {
+    if (!this.params) this.params = {};
+    this.params[name] = handler;
+    return this;
+  }
+
+  /**
+   * Register HEAD handler (Express-compatible).
+   *
+   * @param {string} path - Route pattern
+   * @param {...Function} handlers - Route handlers
+   * @returns {iopress} Returns this for chaining
+   */
+  head(path, ...handlers) {
+    this._addRoute('HEAD', path, handlers);
+    return this;
+  }
+
+  /**
+   * Register OPTIONS handler (Express-compatible).
+   *
+   * @param {string} path - Route pattern
+   * @param {...Function} handlers - Route handlers
+   * @returns {iopress} Returns this for chaining
+   */
+  options(path, ...handlers) {
+    this._addRoute('OPTIONS', path, handlers);
     return this;
   }
 
