@@ -15,7 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MAX_FAST_ROUTES 64
+#define MAX_FAST_ROUTES 256
 #define MAX_PATH_LEN 128
 #define MAX_RESPONSE_LEN 4096
 #define MAX_FULL_RESPONSE 8192

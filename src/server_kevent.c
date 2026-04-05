@@ -636,7 +636,7 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
   /* B5: HTTP Pipeline batching - process multiple requests in a loop */
   int requests_processed = 0;
   const int max_pipeline_batch =
-      4; /* Process up to 4 pipelined requests per event */
+      8; /* Process up to 8 pipelined requests per event */
 
   while (requests_processed < max_pipeline_batch) {
     /* Try to parse request */
@@ -809,7 +809,7 @@ static void* event_loop_thread(void* arg) {
       if ((int)ev->ident == ctx->listen_fd) {
         /* New connection - accept all pending with edge-triggered efficiency */
         int accepted = 0;
-        while (accepted < 128) { /* Increased from 64 */
+        while (accepted < 256) { /* Increased from 128 for higher throughput */
           struct sockaddr_in client_addr;
           socklen_t addr_len = sizeof(client_addr);
           int client_fd =
@@ -817,7 +817,7 @@ static void* event_loop_thread(void* arg) {
           if (client_fd < 0) break;
 
           set_nonblocking(client_fd);
-          tune_socket(client_fd);
+          set_nodelay(client_fd); /* TCP_NODELAY for latency */
 
           connection_t* conn =
               get_connection(ctx->connections, ctx->max_connections, client_fd);

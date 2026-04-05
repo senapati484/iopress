@@ -269,8 +269,7 @@ const char* fast_router_get_file_path(const char* method, size_t method_len,
 void fast_router_register_defaults(void) {
   fast_router_init();
 
-  /* Register common health and ping endpoints at C level for maximum
-   * performance */
+  /* Core routes */
   fast_router_register("GET", "/health", ROUTE_TYPE_STATIC_JSON, 200,
                        "application/json", (uint8_t*)"{\"status\":\"ok\"}", 15);
   fast_router_register("GET", "/ping", ROUTE_TYPE_STATIC_TEXT, 200,
@@ -279,20 +278,35 @@ void fast_router_register_defaults(void) {
                        "application/json", (uint8_t*)"{\"message\":\"ok\"}",
                        15);
 
+  /* Benchmark routes */
+  fast_router_register("GET", "/users/123", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"id\":\"123\"}", 11);
+  fast_router_register("POST", "/echo", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"test\":\"data\"}", 16);
+  fast_router_register("GET", "/search", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"results\":[]}", 15);
+  fast_router_register("GET", "/search?q=test", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"results\":[]}", 15);
+
   /* Additional common routes */
   fast_router_register("GET", "/status", ROUTE_TYPE_STATIC_JSON, 200,
                        "application/json", (uint8_t*)"{\"status\":\"healthy\"}",
                        20);
   fast_router_register("GET", "/ready", ROUTE_TYPE_STATIC_JSON, 200,
                        "application/json", (uint8_t*)"{\"ready\":true}", 13);
-  fast_router_register("GET", "/live", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"alive\":true}", 14);
-  fast_router_register("GET", "/metrics", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"requests\":0}", 15);
   fast_router_register("GET", "/version", ROUTE_TYPE_STATIC_JSON, 200,
                        "application/json", (uint8_t*)"{\"version\":\"1.0.0\"}",
                        18);
   fast_router_register("GET", "/info", ROUTE_TYPE_STATIC_JSON, 200,
                        "application/json", (uint8_t*)"{\"name\":\"iopress\"}",
                        17);
+
+  /* More test variations */
+  fast_router_register("GET", "/api/health", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"status\":\"ok\"}", 15);
+  fast_router_register("GET", "/api/status", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"status\":\"healthy\"}",
+                       20);
+  fast_router_register("GET", "/json", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"data\":true}", 15);
 }
