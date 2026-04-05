@@ -5,7 +5,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Performance                                                    │
-│  ───────────                                                    │
+│  ─────────────────────────────────────────────────────────────  │
 │  Linux + io_uring:    500,000+ req/s                            │
 │  macOS + kqueue:      150,000+ req/s                            │
 │  Windows + IOCP:      100,000+ req/s                            │
