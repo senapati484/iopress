@@ -548,8 +548,8 @@ app.listen(3000);
 
 ```bash
 # Clone the repository
-git clone https://github.com/senapati484/@iopress/core.git
-cd @iopress/core
+git clone https://github.com/senapati484/iopress.git
+cd iopress
 
 # Install dependencies
 npm install
