@@ -636,7 +636,7 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
   /* B5: HTTP Pipeline batching - process multiple requests in a loop */
   int requests_processed = 0;
   const int max_pipeline_batch =
-      8; /* Process up to 8 pipelined requests per event */
+      4; /* Process up to 4 pipelined requests per event */
 
   while (requests_processed < max_pipeline_batch) {
     /* Try to parse request */
@@ -662,32 +662,6 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
     }
 
     if (status == PARSE_STATUS_DONE) {
-      /* Request complete - notify JS layer */
-      conn->request_complete = true;
-      conn->body_start = result.body_start;
-      conn->keep_alive =
-          result.http_minor >= 1; /* HTTP/1.1 default keep-alive */
-
-      /* B9: For chunked encoding, assemble body into a contiguous buffer */
-      if (result.body_present && result.body_length > 0) {
-        /* Chunked body - assemble if not already done */
-        if (!conn->assembled_body) {
-          size_t assembled_len = 0;
-          uint8_t* assembled = assemble_chunked_body(
-              conn->buffer + result.body_start,
-              conn->buffer_len - result.body_start, &assembled_len);
-          if (assembled && assembled_len > 0) {
-            conn->assembled_body = assembled;
-            conn->assembled_body_len = assembled_len;
-          }
-        }
-      }
-
-      /* Store parse result - just reference, no malloc */
-      conn->body_start = result.body_start;
-      conn->body_remaining = result.body_length;
-      conn->request_complete = true;
-
       /* FAST PATH: Try fast router before JS callback - use pre-built response
        */
       uint8_t* fast_response = NULL;
@@ -736,6 +710,31 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
         }
         continue;
       }
+
+      /* Slow path: need to notify JS */
+      conn->request_complete = true;
+      conn->body_start = result.body_start;
+      conn->keep_alive =
+          result.http_minor >= 1; /* HTTP/1.1 default keep-alive */
+
+      /* B9: For chunked encoding, assemble body into a contiguous buffer */
+      if (result.body_present && result.body_length > 0) {
+        /* Chunked body - assemble if not already done */
+        if (!conn->assembled_body) {
+          size_t assembled_len = 0;
+          uint8_t* assembled = assemble_chunked_body(
+              conn->buffer + result.body_start,
+              conn->buffer_len - result.body_start, &assembled_len);
+          if (assembled && assembled_len > 0) {
+            conn->assembled_body = assembled;
+            conn->assembled_body_len = assembled_len;
+          }
+        }
+      }
+
+      /* Store parse result - just reference, no malloc */
+      conn->body_start = result.body_start;
+      conn->body_remaining = result.body_length;
 
       /* Call JS callback (threadsafe) */
       if (ctx->on_request) {
@@ -809,7 +808,7 @@ static void* event_loop_thread(void* arg) {
       if ((int)ev->ident == ctx->listen_fd) {
         /* New connection - accept all pending with edge-triggered efficiency */
         int accepted = 0;
-        while (accepted < 256) { /* Increased from 128 for higher throughput */
+        while (accepted < 128) { /* Increased from 64 */
           struct sockaddr_in client_addr;
           socklen_t addr_len = sizeof(client_addr);
           int client_fd =
@@ -817,7 +816,7 @@ static void* event_loop_thread(void* arg) {
           if (client_fd < 0) break;
 
           set_nonblocking(client_fd);
-          set_nodelay(client_fd); /* TCP_NODELAY for latency */
+          tune_socket(client_fd);
 
           connection_t* conn =
               get_connection(ctx->connections, ctx->max_connections, client_fd);

@@ -33,8 +33,8 @@ typedef SSIZE_T ssize_t;
  * ============================================================================
  */
 
-/** Default initial buffer size for connections (16KB for better performance) */
-#define DEFAULT_INITIAL_BUFFER_SIZE 16384
+/** Default initial buffer size for connections (4KB) */
+#define DEFAULT_INITIAL_BUFFER_SIZE 4096
 
 /** Default maximum body size (1MB) */
 #define DEFAULT_MAX_BODY_SIZE 1048576
