@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-04-05T01:38:50.838Z",
+  "systemInfo": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 8,
+    "cpuModel": "Apple M2",
+    "totalMemory": 8192,
+    "freeMemory": 126,
+    "nodeVersion": "v20.18.0",
+    "v8Version": "11.3.244.8-node.23",
+    "uptime": 475868
+  },
+  "platform": "darwin",
+  "target": {
+    "backend": "kqueue",
+    "minRps": 80000,
+    "targetRps": 150000,
+    "maxLatencyP99": 5
+  },
+  "results": {
+    "iopress": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 64678.9,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 646789,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-04-05T01:38:15.618Z"
+      },
+      "health-check": {
+        "scenario": "health-check",
+        "stats": {
+          "rps": 61981.8,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 619818,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-04-05T01:38:25.645Z"
+      }
+    },
+    "express": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 8860,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 88600,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-04-05T01:38:40.794Z"
+      },
+      "health-check": {
+        "scenario": "health-check",
+        "stats": {
+          "rps": 8830,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 88300,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-04-05T01:38:50.836Z"
+      }
+    }
+  }
+}

@@ -38,7 +38,7 @@ module.exports = [
     }
   },
   {
-    files: ['test/**/*.js', 'benchmark/**/*.js', 'scripts/**/*.js'],
+    files: ['test/**/*.js', 'benchmarks/**/*.js', 'scripts/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',

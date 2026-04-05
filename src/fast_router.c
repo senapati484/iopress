@@ -278,4 +278,21 @@ void fast_router_register_defaults(void) {
   fast_router_register("GET", "/", ROUTE_TYPE_STATIC_JSON, 200,
                        "application/json", (uint8_t*)"{\"message\":\"ok\"}",
                        15);
+
+  /* Additional common routes */
+  fast_router_register("GET", "/status", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"status\":\"healthy\"}",
+                       20);
+  fast_router_register("GET", "/ready", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"ready\":true}", 13);
+  fast_router_register("GET", "/live", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"alive\":true}", 14);
+  fast_router_register("GET", "/metrics", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"requests\":0}", 15);
+  fast_router_register("GET", "/version", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"version\":\"1.0.0\"}",
+                       18);
+  fast_router_register("GET", "/info", ROUTE_TYPE_STATIC_JSON, 200,
+                       "application/json", (uint8_t*)"{\"name\":\"iopress\"}",
+                       17);
 }
