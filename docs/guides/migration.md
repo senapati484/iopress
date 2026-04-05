@@ -6,21 +6,21 @@ This guide helps you migrate existing Express.js applications to iopress. Most a
 
 ## Quick Reference
 
-| Feature | Express.js | iopress | Action |
-|---------|-----------|-------------|--------|
-| Import | `require('express')` | `require('@iopress/core')` | ✅ Replace |
-| App creation | `express()` | `iopress()` | ⚠️  Update |
-| Route handlers | `app.get()` | `app.get()` | ✅ Same |
-| Middleware | `app.use()` | `app.use()` | ✅ Same |
-| Route params | `req.params.id` | `req.params.id` | ✅ Same |
-| Query params | `req.query` | `req.query` | ✅ Same |
-| JSON responses | `res.json()` | `res.json()` | ✅ Same |
-| Status codes | `res.status(404)` | `res.status(404)` | ✅ Same |
-| Body parsing | `express.json()` | Built-in | ⚠️  Remove middleware |
-| Static files | `express.static()` | Not included | ❌ Manual implementation |
-| View engines | `app.set('view engine')` | Not supported | ❌ Use API-only approach |
-| Sessions | `express-session` | Not included | ❌ External service |
-| Cookies | `cookie-parser` | Not included | ❌ Manual parsing |
+| Feature       | Express.js          | iopress                    | Action                 |
+|---------------|---------------------|----------------------------|------------------------|
+| Import        | `require('express')`| `require('@iopress/core')` | ✅ Replace              |
+| App creation  | `express()`         | `iopress()`                | ⚠️  Update              |
+| Route handlers| `app.get()`         | `app.get()`                | ✅ Same                 |
+| Middleware    | `app.use()`         | `app.use()`                | ✅ Same                 |
+| Route params  | `req.params.id`     | `req.params.id`            | ✅ Same                 |
+| Query params  | `req.query`         | `req.query`                | ✅ Same                 |
+| JSON responses| `res.json()`        | `res.json()`               | ✅ Same                 |
+| Status codes  | `res.status(404)`   | `res.status(404)`          | ✅ Same                 |
+| Body parsing  | `express.json()`    | Built-in                   | ⚠️  Remove middleware   |
+| Static files  | `express.static()`  | Not included               | ❌ Manual implementation|
+| View engines  | `app.set('view engine')`| Not supported          | ❌ Use API-only approach|
+| Sessions      | `express-session`   | Not included               | ❌ External service     |
+| Cookies       | `cookie-parser`     | Not included               | ❌ Manual parsing       |
 
 ## Step-by-Step Migration
 
@@ -306,12 +306,12 @@ app.listen(3000, () => {
 
 iopress automatically selects the best async I/O backend for your platform:
 
-| Platform | Backend | Expected Performance |
-|----------|---------|---------------------|
-| Linux 5.1+ | io_uring | **500,000+ req/s** |
-| macOS | kqueue | 150,000+ req/s |
-| Windows | IOCP | 100,000+ req/s |
-| Other | libuv | 40,000+ req/s |
+| Platform   | Backend  | Expected Performance |
+|------------|----------|----------------------|
+| Linux 5.1+ | io_uring | **500,000+ req/s**   |
+| macOS      | kqueue   | 150,000+ req/s       |
+| Windows    | IOCP     | 100,000+ req/s       |
+| Other      | libuv    | 40,000+ req/s        |
 
 ### Graceful Degradation
 

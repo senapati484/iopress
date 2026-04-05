@@ -34,19 +34,18 @@ Welcome to the iopress documentation! Choose your path:
 | Topic | Description |
 |-------|-------------|
 | [Performance Analysis](performance/PERFORMANCE.md) | Benchmarks and optimization |
-| [Fast Router](../src/fast_router.c) | C-level routing for maximum speed |
+| [Architecture](architecture.md) | System design and flow |
 
 ## Development
 
 | Topic | Description |
 |-------|-------------|
-| [Roadmap](../ROADMAP.md) | Future features and v2 plans |
-| [Changelog](../CHANGELOG.md) | Version history |
-| [Development Roadmap](development-roadmap.md) | Implementation priorities |
+| [Roadmap](roadmap.md) | Future features and v2 plans |
+| [Changelog](changelog.md) | Version history |
 
 ## Key Features
 
-- ⚡ **High Performance**: 300k+ req/s on Linux with io_uring
+- ⚡ **High Performance**: 218k+ req/s on macOS (tested), 500k+ expected on Linux
 - 🚀 **Native Speed**: Written in C with platform-specific optimizations
 - 📦 **Express Compatible**: Drop-in replacement for Express.js
 - 🔧 **Prebuilt Binaries**: No build tools required
@@ -56,9 +55,9 @@ Welcome to the iopress documentation! Choose your path:
 
 | Platform | Status | Performance |
 |----------|--------|-------------|
-| Linux (io_uring) | ✅ Full | 300k-500k req/s |
-| macOS (kqueue) | ✅ Full | 80k+ req/s |
-| Windows (IOCP) | ✅ Full | 100k+ req/s |
+| Linux (io_uring) | ⏳ Pending | 500k+ expected |
+| macOS (kqueue) | ✅ Tested | 218k+ req/s |
+| Windows (IOCP) | ⏳ Pending | 100k+ expected |
 
 ## Quick Links
 
@@ -66,12 +65,6 @@ Welcome to the iopress documentation! Choose your path:
 - [npm Package](https://www.npmjs.com/package/@iopress/core)
 - [Issues & Bug Reports](https://github.com/senapati484/iopress/issues)
 - [Discussions](https://github.com/senapati484/iopress/discussions)
-
-## Community
-
-- 💬 [Discord](https://discord.gg/iopress)
-- 🐦 [Twitter](https://twitter.com/iopress)
-- 📧 [Email Support](mailto:support@iopress.dev)
 
 ---
 

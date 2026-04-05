@@ -14,39 +14,39 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 1: JavaScript API (User Interface)                     │
+│  Layer 1: JavaScript API (User Interface)                       │
 │  ───────────────────────────────────────────                    │
-│  - js/index.js: Express-like API                               │
+│  - js/index.js: Express-like API                                │
 │  - Request/Response objects                                     │
-│  - Middleware chain execution                                    │
+│  - Middleware chain execution                                   │
 │  - Route matching                                               │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: N-API Bridge (JavaScript ↔ Native)                 │
+│  Layer 2: N-API Bridge (JavaScript ↔ Native)                    │
 │  ─────────────────────────────────────────────────────          │
-│  - index.js: Native addon loader                               │
-│  - binding.c: N-API function bindings                          │
+│  - index.js: Native addon loader                                │
+│  - binding.c: N-API function bindings                           │
 │  - Thread-safe callback handling                                │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 3: Platform Backend (C Implementation)                 │
-│  ───────────────────────────────────────────                   │
-│  - server_kevent.c: macOS/BSD (kqueue)                        │
-│  - server_uring.c: Linux (io_uring)                            │
-│  - server_iocp.c: Windows (IOCP)                               │
+│  Layer 3: Platform Backend (C Implementation)                   │
+│  ───────────────────────────────────────────                    │
+│  - server_kevent.c: macOS/BSD (kqueue)                          │
+│  - server_uring.c: Linux (io_uring)                             │
+│  - server_iocp.c: Windows (IOCP)                                │
 │  - server_libuv.c: Fallback                                     │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 4: Core Components (Shared C Code)                     │
-│  ──────────────────────────────────────────                    │
-│  - parser.c: HTTP request parsing                              │
-│  - fast_router.c: High-performance routing                     │
+│  Layer 4: Core Components (Shared C Code)                       │
+│  ──────────────────────────────────────────                     │
+│  - parser.c: HTTP request parsing                               │
+│  - fast_router.c: High-performance routing                      │
 │  - server.h: Platform-agnostic interface                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -260,25 +260,25 @@ HTTP Request Received
         │
         ▼
 ┌───────────────────┐
-│ Parse HTTP Request │
+│ Parse HTTP Request│
 └─────────┬─────────┘
           │
           ▼
-┌───────────────────────────────────┐
-│ Check Static Route (O(1) lookup) │
+┌─────────────────────────────────┐
+│ Check Static Route (O(1) lookup)│
 └─────────────┬───────────────────┘
               │
     ┌─────────┴─────────┐
-    │                    │
-    ▼                    ▼
- YES                    NO
-    │                    │
-    ▼                    ▼
-┌──────────────┐   ┌─────────────────┐
+    │                   │
+    ▼                   ▼
+ YES                   NO
+    │                   │
+    ▼                   ▼
+┌───────────────┐  ┌─────────────────┐
 │ Send Pre-built│  │ Call JS Handler │
-│ Response     │  │ (via N-API)     │
-│ (ZERO ALLOC) │  │                 │
-└──────────────┘  └─────────────────┘
+│ Response      │  │ (via N-API)     │
+│ (ZERO ALLOC)  │  │                 │
+└───────────────┘  └─────────────────┘
 ```
 
 **Fast path (~200k+ RPS):**
@@ -394,7 +394,7 @@ The server checks `Connection: keep-alive` header and either:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Memory Layout                                 │
+│                    Memory Layout                                │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────┐
@@ -413,10 +413,10 @@ The server checks `Connection: keep-alive` header and either:
 │  connections[0..65535]       │
 │  ┌─────────────────────────┐ │
 │  │ connection_t            │ │
-│  │  - fd                  │ │
-│  │  - buffer[]            │ │
-│  │  - buffer_len          │ │
-│  │  - keep_alive          │ │
+│  │  - fd                   │ │
+│  │  - buffer[]             │ │
+│  │  - buffer_len           │ │
+│  │  - keep_alive           │ │
 │  └─────────────────────────┘ │
 └──────────────────────────────┘
          │
@@ -424,7 +424,7 @@ The server checks `Connection: keep-alive` header and either:
 ┌──────────────────────────────┐
 │  Pre-computed Responses      │
 │  ──────────────────────────  │
-│  RESPONSE_200_JSON[]        │
+│  RESPONSE_200_JSON[]         │
 │  RESPONSE_200_PING[]         │
 │  RESPONSE_404[]              │
 └──────────────────────────────┘
@@ -463,27 +463,27 @@ Hash-based route lookup in native code before falling back to JavaScript.
                                              │
                                              ▼
                                       ┌──────────────┐
-                                      │ Read        │
-                                      │ Request     │
+                                      │ Read         │
+                                      │ Request      │
                                       └──────┬───────┘
                                              │
                                              ▼
                                       ┌──────────────┐
-                                      │ Parse       │
-                                      │ HTTP        │
+                                      │ Parse        │
+                                      │ HTTP         │
                                       └──────┬───────┘
                                              │
                                              ▼
                               ┌──────────────┴──────────┐
                               │                         │
-                     ┌────────▼────────┐      ┌─────────▼────────┐
-                     │ Static Route?  │      │ Dynamic Route   │
-                     │ (fast path)    │      │ (slow path)     │
+                     ┌────────▼────────┐      ┌─────────▼───────┐
+                     │ Static Route?   │      │ Dynamic Route   │
+                     │ (fast path)     │      │ (slow path)     │
                      └────────┬────────┘      └────────┬────────┘
                               │                        │
-                     ┌────────▼────────┐      ┌─────────▼────────┐
-                     │ write()       │      │ N-API Callback   │
-                     │ pre-built     │      │ JavaScript      │
+                     ┌────────▼────────┐      ┌─────────▼───────┐
+                     │ write()         │      │ N-API Callback  │
+                     │ pre-built       │      │ JavaScript      │
                      └────────┬────────┘      └────────┬────────┘
                               │                        │
                               └────────┬───────────────┘
@@ -507,9 +507,9 @@ Hash-based route lookup in native code before falling back to JavaScript.
 ┌─────────────────────────────────────────┐
 │  User Code                              │
 │  ──────────                             │
-│  app.get('/health', handler)          │
+│  app.get('/health', handler)            │
 │  app.use(middleware)                    │
-│  app.listen(3000)                      │
+│  app.listen(3000)                       │
 └─────────────────┬───────────────────────┘
                   │
                   ▼
@@ -517,8 +517,8 @@ Hash-based route lookup in native code before falling back to JavaScript.
 │  iopress Class (js/index.js)            │
 │  ─────────────────────────────────────  │
 │  - routes[]                             │
-│  - middleware[]                        │
-│  - _matchRoute()                       │
+│  - middleware[]                         │
+│  - _matchRoute()                        │
 │  - _executeChain()                      │
 └─────────────────┬───────────────────────┘
                   │
@@ -534,7 +534,7 @@ Hash-based route lookup in native code before falling back to JavaScript.
 ┌─────────────────────────────────────────┐
 │  Native Listen()                        │
 │  ────────────────                       │
-│  binding.c → server_init()             │
+│  binding.c → server_init()              │
 └─────────────────────────────────────────┘
 ```
 
@@ -542,19 +542,19 @@ Hash-based route lookup in native code before falling back to JavaScript.
 
 ## Key Files and Their Roles
 
-| File | Layer | Purpose |
-|------|-------|---------|
-| `index.js` | Entry | Load native addon |
-| `js/index.js` | API | Express-compatible API |
-| `js/request.js` | API | Request object wrapper |
-| `js/response.js` | API | Response object wrapper |
-| `src/binding.c` | Bridge | N-API bindings |
-| `src/server_kevent.c` | Backend | macOS kqueue |
-| `src/server_uring.c` | Backend | Linux io_uring |
-| `src/server_iocp.c` | Backend | Windows IOCP |
-| `src/parser.c` | Core | HTTP parsing |
-| `src/fast_router.c` | Core | Fast route lookup |
-| `src/server.h` | Core | Platform interface |
+| File                 | Layer   | Purpose                 |
+|----------------------|---------|-------------------------|
+| `index.js`           | Entry   | Load native addon       |
+| `js/index.js`        | API     | Express-compatible API  |
+| `js/request.js`      | API     | Request object wrapper  |
+| `js/response.js`     | API     | Response object wrapper |
+| `src/binding.c`      | Bridge  | N-API bindings          |
+| `src/server_kevent.c`| Backend | macOS kqueue            |
+| `src/server_uring.c` | Backend | Linux io_uring          |
+| `src/server_iocp.c`  | Backend | Windows IOCP            |
+| `src/parser.c`       | Core    | HTTP parsing            |
+| `src/fast_router.c`  | Core    | Fast route lookup       |
+| `src/server.h`       | Core    | Platform interface      |
 
 ---
 

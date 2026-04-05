@@ -4,8 +4,8 @@
 
 | Version | Status          | Security Fixes |
 |---------|-----------------|----------------|
-| 1.x     | Current         | ✅ Supported     |
-| < 1.0   | Not released    | ❌ Unsupported   |
+| 1.x     | Current         | ✅ Supported    |
+| < 1.0   | Not released    | ❌ Unsupported  |
 
 ## Reporting a Vulnerability
 
@@ -13,12 +13,12 @@
 
 ### Private Disclosure Channels
 
-| Severity | Response Time | Method                                                                 |
-|----------|---------------|------------------------------------------------------------------------|
+| Severity | Response Time | Method                                                                            |
+|----------|---------------|-----------------------------------------------------------------------------------|
 | Critical | 24 hours      | GitHub Security Advisory: [Report a vulnerability](../../security/advisories/new) |
-| High     | 48 hours      | Email: security@iopress.dev (or GitHub Security tab)                |
-| Moderate | 72 hours      | GitHub Security Advisory                                               |
-| Low      | 1 week        | GitHub Security Advisory                                               |
+| High     | 48 hours      | Email: security@iopress.dev (or GitHub Security tab)                              |
+| Moderate | 72 hours      | GitHub Security Advisory                                                          |
+| Low      | 1 week        | GitHub Security Advisory                                                          |
 
 ### Disclosure Process
 
@@ -31,8 +31,8 @@
 
 ### Response SLAs
 
-| Phase                | Critical | High     | Moderate | Low      |
-|----------------------|----------|----------|----------|----------|
+| Phase                  | Critical | High     | Moderate | Low      |
+|------------------------|----------|----------|----------|----------|
 | Initial Acknowledgment | 24 hours | 48 hours | 72 hours | 1 week   |
 | Fix Developed          | 7 days   | 14 days  | 30 days  | 90 days  |
 | Advisory Published     | With fix | With fix | With fix | With fix |

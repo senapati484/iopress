@@ -28,14 +28,14 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 
 ```
 ╔═══════════════════════════════════════════════════════════════════╗
-║  BENCHMARK RESULTS - macOS kqueue (TESTED)                       ║
+║  BENCHMARK RESULTS - macOS kqueue (TESTED)                        ║
 ╠═══════════════════════════════════════════════════════════════════╣
-║  @iopress/core:     218,572 req/s                                ║
+║  @iopress/core:     218,572 req/s                                 ║
 ║  Express.js:       17,112 req/s                                   ║
-║  Speedup:           12.8x faster                                 ║
+║  Speedup:           12.8x faster                                  ║
 ║  p99 Latency:       <1ms                                          ║
 ╠═══════════════════════════════════════════════════════════════════╣
-║  ✓ PASSED - Target: 150,000 req/s | Achieved: 218,572 req/s      ║
+║  ✓ PASSED - Target: 150,000 req/s | Achieved: 218,572 req/s       ║
 ╚═══════════════════════════════════════════════════════════════════╝
 ```
 
@@ -58,6 +58,13 @@ Expected: 100,000+ req/s | Requires Windows environment for testing
 - [Building from Source](#building-from-source)
 - [Benchmarks](#benchmarks)
 - [License](#license)
+
+## Additional Documentation
+
+- [Architecture](docs/architecture.md) - System design and request flow
+- [Test Results](docs/test-results.md) - Platform benchmark results
+- [Migration Guide](docs/guides/migration.md) - Migrate from Express.js
+- [Performance](docs/performance.md) - Optimization details
 
 ## Installation
 
@@ -494,7 +501,7 @@ console.log(iopress.backend);  // 'io_uring', 'kqueue', 'iocp', or 'libuv'
 | Session | Built-in | Not included |
 | Cookie parsing | Built-in middleware | Not included |
 
-See [COMPATIBILITY.md](./COMPATIBILITY.md) for detailed migration guide.
+See [COMPATIBILITY.md](./docs/compatibility.md) for detailed migration guide.
 
 ### Migration Example
 
