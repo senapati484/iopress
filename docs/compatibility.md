@@ -192,8 +192,8 @@ The following Express.js features are **explicitly out of scope** for iopress v1
 | Feature | Reason | Alternative |
 |---------|--------|-------------|
 | `express.static()` | File I/O blocks event loop | Use nginx, CDN, or dedicated file server |
-| `app.engine()` / `res.render()` | Template rendering is CPU-intensive | Pre-render or use dedicated service |
-| `req.cookies` / `res.cookie()` | Requires cookie parsing overhead | Use `cookie-parser` package if needed |
+| `app.engine()` | `res.render()` | Template rendering is CPU-intensive | Pre-render or use dedicated service |
+| `req.cookies` | `res.cookie()` | Requires cookie parsing overhead | Use `cookie-parser` package if needed |
 | `express-session` | Stateful, requires storage backend | Use JWT tokens or external session store |
 | `express.Router()` | Adds complexity, minimal perf benefit | Use `app.use('/prefix', handler)` |
 | `app.param()` | Adds indirection | Parse params directly in handlers |
