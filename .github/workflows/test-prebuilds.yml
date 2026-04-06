@@ -1,0 +1,89 @@
+name: Test Prebuilt Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  test-prebuilds:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [18, 20]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: darwin
+
+    steps:
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install package without build tools
+        env:
+          npm_config_build_from_source: "false"
+        run: |
+          npm install @iopress/core@${{ github.event.inputs.version }} --save-exact
+        continue-on-error: true
+
+      - name: Test if binary was downloaded
+        run: |
+          if [ -f "node_modules/@iopress/core/build/Release/express_pro_native.node" ]; then
+            echo "✓ Prebuilt binary found"
+            ls -la node_modules/@iopress/core/build/Release/
+            file node_modules/@iopress/core/build/Release/express_pro_native.node
+          else
+            echo "✗ Prebuilt binary not found - fallback to build likely occurred"
+            ls -la node_modules/@iopress/core/
+            exit 1
+          fi
+
+      - name: Test module loading
+        run: |
+          node -e "
+            const iopress = require('./node_modules/@iopress/core');
+            console.log('Module loaded successfully');
+            console.log('Backend:', iopress.backend);
+            console.log('Version:', iopress.version);
+
+            const app = iopress();
+            app.get('/health', (req, res) => res.json({status: 'ok'}));
+
+            const server = app.listen(0, () => {
+              const port = server.port;
+              console.log('Server started on port:', port);
+
+              // Quick test
+              const http = require('http');
+              http.get('http://localhost:' + port + '/health', (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                  console.log('Response:', data);
+                  console.log('✓ Prebuilt binary works correctly!');
+                  process.exit(0);
+                });
+              }).on('error', (err) => {
+                console.error('✗ Request failed:', err);
+                process.exit(1);
+              });
+            });
+          "
+
+      - name: Document glibc version (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          echo "GLIBC version:"
+          ldd --version
+          echo ""
+          echo "Binary dependencies:"
+          ldd node_modules/@iopress/core/build/Release/express_pro_native.node || true
