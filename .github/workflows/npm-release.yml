@@ -23,6 +23,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 liburing-dev
+
       - name: Get current version from package.json
         id: package
         run: |
@@ -63,6 +68,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 liburing-dev
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
