@@ -4,7 +4,7 @@
  * High-performance Linux backend using io_uring for async I/O.
  *
  * @file server_uring.c
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 #include "server.h"
@@ -28,123 +28,6 @@
 #include "parser.h"
 
 /* ============================================================================
- * Pre-computed Responses
- * ============================================================================
- */
-
-static const uint8_t RESPONSE_200_JSON_EMPTY[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 2\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{}";
-
-static const uint8_t RESPONSE_200_JSON_HEALTH[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 15\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{\"status\":\"ok\"}";
-
-static const uint8_t RESPONSE_200_PING[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 4\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: text/plain\r\n"
-    "\r\n"
-    "pong";
-
-static const uint8_t RESPONSE_404[] =
-    "HTTP/1.1 404 Not Found\r\n"
-    "Content-Length: 9\r\n"
-    "Connection: close\r\n"
-    "\r\n"
-    "Not Found";
-
-static const uint8_t RESPONSE_200_USERS[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 13\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{\"users\":[]}";
-
-static const uint8_t RESPONSE_200_ECHO[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 16\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{\"test\":\"data\"}";
-
-static const uint8_t RESPONSE_200_SEARCH[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 15\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{\"results\":[]}";
-
-static const size_t RESPONSE_200_JSON_EMPTY_LEN =
-    sizeof(RESPONSE_200_JSON_EMPTY) - 1;
-static const size_t RESPONSE_200_JSON_HEALTH_LEN =
-    sizeof(RESPONSE_200_JSON_HEALTH) - 1;
-static const size_t RESPONSE_200_PING_LEN = sizeof(RESPONSE_200_PING) - 1;
-static const size_t RESPONSE_404_LEN = sizeof(RESPONSE_404) - 1;
-static const size_t RESPONSE_200_USERS_LEN = sizeof(RESPONSE_200_USERS) - 1;
-static const size_t RESPONSE_200_ECHO_LEN = sizeof(RESPONSE_200_ECHO) - 1;
-static const size_t RESPONSE_200_SEARCH_LEN = sizeof(RESPONSE_200_SEARCH) - 1;
-
-/* Pre-computed response lookup - optimized for common paths */
-static const uint8_t* get_static_response(const char* method, size_t method_len,
-                                          const char* path, size_t path_len,
-                                          size_t* out_len) {
-  /* Fast path only handles GET for static pre-computed responses */
-  if (method_len != 3 || memcmp(method, "GET", 3) != 0) {
-    return NULL;
-  }
-
-  /* Direct lookup for most common endpoints - O(1) */
-  switch (path_len) {
-    case 1:
-      if (path[0] == '/') {
-        *out_len = RESPONSE_200_JSON_EMPTY_LEN;
-        return RESPONSE_200_JSON_EMPTY;
-      }
-      break;
-    case 5:
-      if (memcmp(path, "/ping", 5) == 0) {
-        *out_len = RESPONSE_200_PING_LEN;
-        return RESPONSE_200_PING;
-      }
-      if (memcmp(path, "/echo", 5) == 0) {
-        *out_len = RESPONSE_200_ECHO_LEN;
-        return RESPONSE_200_ECHO;
-      }
-      break;
-    case 6:
-      if (memcmp(path, "/users", 6) == 0) {
-        *out_len = RESPONSE_200_USERS_LEN;
-        return RESPONSE_200_USERS;
-      }
-      break;
-    case 7:
-      if (memcmp(path, "/health", 7) == 0) {
-        *out_len = RESPONSE_200_JSON_HEALTH_LEN;
-        return RESPONSE_200_JSON_HEALTH;
-      }
-      if (memcmp(path, "/search", 7) == 0) {
-        *out_len = RESPONSE_200_SEARCH_LEN;
-        return RESPONSE_200_SEARCH;
-      }
-      break;
-  }
-  return NULL;
-}
-
-/* ============================================================================
  * Constants
  * ============================================================================
  */
@@ -163,6 +46,173 @@ typedef struct {
 } uring_data_t;
 
 /* ============================================================================
+ * Helper Functions
+ * ============================================================================
+ */
+
+static char* fast_itoa_size(size_t val, char* buf) {
+  char tmp[16];
+  int i = 0;
+  if (val == 0) {
+    buf[0] = '0';
+    buf[1] = '\0';
+    return buf;
+  }
+  while (val > 0) {
+    tmp[i++] = '0' + (val % 10);
+    val /= 10;
+  }
+  for (int j = 0; j < i; j++) {
+    buf[j] = tmp[i - 1 - j];
+  }
+  buf[i] = '\0';
+  return buf;
+}
+
+static char* fast_itoa(uint16_t val, char* buf) {
+  return fast_itoa_size((size_t)val, buf);
+}
+
+static int format_http_response_fast(int status_code, const uint8_t* body,
+                                     size_t body_len, uint8_t* out,
+                                     size_t out_cap, size_t* out_len) {
+  (void)out_cap;
+
+  /* Fast status line - optimized for common cases */
+  out[0] = 'H';
+  out[1] = 'T';
+  out[2] = 'T';
+  out[3] = 'P';
+  out[4] = '/';
+  out[5] = '1';
+  out[6] = '.';
+  out[7] = '1';
+  out[8] = ' ';
+  char* p = (char*)out + 9;
+
+  if (status_code == 200) {
+    p[0] = '2';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'O';
+    p[5] = 'K';
+    p += 6;
+  } else if (status_code == 404) {
+    p[0] = '4';
+    p[1] = '0';
+    p[2] = '4';
+    p[3] = ' ';
+    p[4] = 'N';
+    p[5] = 'o';
+    p[6] = 't';
+    p[7] = ' ';
+    p[8] = 'F';
+    p[9] = 'o';
+    p[10] = 'u';
+    p[11] = 'n';
+    p[12] = 'd';
+    p += 13;
+  } else if (status_code == 400) {
+    p[0] = '4';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'B';
+    p[5] = 'a';
+    p[6] = 'd';
+    p[7] = ' ';
+    p[8] = 'R';
+    p[9] = 'e';
+    p[10] = 'q';
+    p[11] = 'u';
+    p[12] = 'e';
+    p[13] = 's';
+    p[14] = 't';
+    p += 15;
+  } else {
+    fast_itoa((uint16_t)status_code, p);
+    while (*p) p++;
+    *p++ = ' ';
+    const char* sp = "OK";
+    while (*sp) *p++ = *sp++;
+  }
+
+  /* Content-Length header */
+  *p++ = '\r';
+  *p++ = '\n';
+  const char* cl = "Content-Length: ";
+  while (*cl) *p++ = *cl++;
+  fast_itoa_size(body_len, p);
+  while (*p) p++;
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* End headers */
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Body */
+  if (body_len > 0 && body != NULL) {
+    memcpy(p, body, body_len);
+    p += body_len;
+  }
+
+  *out_len = p - (char*)out;
+  return 0;
+}
+
+static int format_http_response(int status_code, const char** headers,
+                                size_t header_count, const uint8_t* body,
+                                size_t body_len, uint8_t* out, size_t out_cap,
+                                size_t* out_len) {
+  const char* status_text = "OK";
+  switch (status_code) {
+    case 200:
+      status_text = "OK";
+      break;
+    case 201:
+      status_text = "Created";
+      break;
+    case 400:
+      status_text = "Bad Request";
+      break;
+    case 404:
+      status_text = "Not Found";
+      break;
+    case 500:
+      status_text = "Internal Server Error";
+      break;
+  }
+
+  int len = snprintf((char*)out, out_cap, "HTTP/1.1 %d %s\r\n", status_code,
+                     status_text);
+  if (len < 0) return -1;
+  char* p = (char*)out + len;
+
+  for (size_t i = 0; i < header_count * 2; i += 2) {
+    len = snprintf(p, out_cap - (p - (char*)out), "%s: %s\r\n", headers[i],
+                   headers[i + 1]);
+    if (len < 0) return -1;
+    p += len;
+  }
+
+  len = snprintf(p, out_cap - (p - (char*)out), "Content-Length: %zu\r\n\r\n",
+                 body_len);
+  if (len < 0) return -1;
+  p += len;
+
+  if (body_len > 0 && body != NULL) {
+    if ((size_t)(p - (char*)out) + body_len > out_cap) return -1;
+    memcpy(p, body, body_len);
+    p += body_len;
+  }
+
+  *out_len = p - (char*)out;
+  return 0;
+}
+
+/* ============================================================================
  * Platform Context
  * ============================================================================
  */
@@ -172,6 +222,9 @@ typedef struct uring_context {
   int listen_fd;
   bool running;
   pthread_t event_thread;
+
+  /* Static data for common operations to avoid malloc */
+  uring_data_t accept_data;
 
   /* Server config and callbacks */
   server_config_t config;
@@ -247,6 +300,21 @@ static connection_t* get_connection(connection_t* pool, size_t pool_size,
     conn->buffer_cap = DEFAULT_INITIAL_BUFFER_SIZE;
     conn->buffer = malloc(conn->buffer_cap);
     if (conn->buffer == NULL) return NULL;
+
+    /* Pre-allocate SQE data objects */
+    uring_data_t* recv_data = malloc(sizeof(uring_data_t));
+    if (recv_data) {
+      recv_data->type = OP_RECV;
+      recv_data->ptr = conn;
+      conn->platform_sqe_data_recv = recv_data;
+    }
+
+    uring_data_t* send_data = malloc(sizeof(uring_data_t));
+    if (send_data) {
+      send_data->type = OP_SEND;
+      send_data->ptr = conn;
+      conn->platform_sqe_data_send = send_data;
+    }
   }
   return conn;
 }
@@ -286,6 +354,16 @@ static void close_connection(uring_context_t* ctx, int fd) {
     }
     conn->buffer_cap = 0;
 
+    /* Cleanup platform_sqe_data */
+    if (conn->platform_sqe_data_recv) {
+      free(conn->platform_sqe_data_recv);
+      conn->platform_sqe_data_recv = NULL;
+    }
+    if (conn->platform_sqe_data_send) {
+      free(conn->platform_sqe_data_send);
+      conn->platform_sqe_data_send = NULL;
+    }
+
     /* Free output buffer */
     if (conn->out_buffer) {
       free(conn->out_buffer);
@@ -315,6 +393,34 @@ static void submit_pending(uring_context_t* ctx) {
   }
 }
 
+static void arm_send(uring_context_t* ctx, connection_t* conn);
+
+static int conn_write(uring_context_t* ctx, connection_t* conn,
+                      const void* data, size_t len) {
+  if (conn == NULL || data == NULL || len == 0) return -1;
+
+  /* Append to output buffer */
+  if (conn->out_buffer_len + len > conn->out_buffer_cap) {
+    size_t new_cap =
+        conn->out_buffer_cap == 0 ? 16384 : conn->out_buffer_cap * 2;
+    while (new_cap < conn->out_buffer_len + len) new_cap *= 2;
+    uint8_t* new_buf = realloc(conn->out_buffer, new_cap);
+    if (!new_buf) return -1;
+    conn->out_buffer = new_buf;
+    conn->out_buffer_cap = new_cap;
+  }
+
+  memcpy(conn->out_buffer + conn->out_buffer_len, data, len);
+  conn->out_buffer_len += len;
+
+  /* If this is the only data, arm the send */
+  if (conn->out_buffer_len == len) {
+    arm_send(ctx, conn);
+  }
+
+  return 0;
+}
+
 static void arm_accept(uring_context_t* ctx) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ctx->ring);
   if (!sqe) {
@@ -323,13 +429,11 @@ static void arm_accept(uring_context_t* ctx) {
     if (!sqe) return;
   }
 
-  uring_data_t* data = malloc(sizeof(uring_data_t));
-  if (!data) return;
-  data->type = OP_ACCEPT;
-  data->ptr = NULL;
+  ctx->accept_data.type = OP_ACCEPT;
+  ctx->accept_data.ptr = NULL;
 
   io_uring_prep_accept(sqe, ctx->listen_fd, NULL, NULL, 0);
-  io_uring_sqe_set_data(sqe, data);
+  io_uring_sqe_set_data(sqe, &ctx->accept_data);
   ctx->pending_sqes++;
 
   if (ctx->pending_sqes >= BATCH_SIZE) {
@@ -358,10 +462,8 @@ static void arm_recv(uring_context_t* ctx, connection_t* conn) {
     space = conn->buffer_cap - conn->buffer_len;
   }
 
-  uring_data_t* data = malloc(sizeof(uring_data_t));
+  uring_data_t* data = (uring_data_t*)conn->platform_sqe_data_recv;
   if (!data) return;
-  data->type = OP_RECV;
-  data->ptr = conn;
 
   io_uring_prep_recv(sqe, conn->fd, conn->buffer + conn->buffer_len, space, 0);
   io_uring_sqe_set_data(sqe, data);
@@ -382,10 +484,8 @@ static void arm_send(uring_context_t* ctx, connection_t* conn) {
     if (!sqe) return;
   }
 
-  uring_data_t* data = malloc(sizeof(uring_data_t));
+  uring_data_t* data = (uring_data_t*)conn->platform_sqe_data_send;
   if (!data) return;
-  data->type = OP_SEND;
-  data->ptr = conn;
 
   io_uring_prep_send(sqe, conn->fd, conn->out_buffer + conn->out_buffer_pos,
                      conn->out_buffer_len - conn->out_buffer_pos, 0);
@@ -481,10 +581,12 @@ static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
   int status = http_parse_request(conn->buffer, conn->buffer_len, &result);
 
   if (status == PARSE_STATUS_ERROR) {
-    const char* response =
-        "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: "
-        "close\r\n\r\n";
-    server_write(NULL, conn, response, strlen(response));
+    const char* headers[] = {"Connection", "close", NULL};
+    uint8_t response[256];
+    size_t response_len;
+    format_http_response(400, headers, 2, NULL, 0, response, sizeof(response),
+                         &response_len);
+    conn_write(ctx, conn, response, response_len);
     close_connection(ctx, conn->fd);
     return;
   }
@@ -498,15 +600,17 @@ static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
     conn->request_complete = true;
     conn->keep_alive = result.http_minor >= 1;
 
-    /* ULTRA FAST PATH: Check pre-computed responses first */
-    size_t static_len = 0;
-    const uint8_t* static_resp =
-        get_static_response(result.method, result.method_len, result.path,
-                            result.path_len, &static_len);
+    /* ULTRA FAST PATH: Check dynamic fast router first */
+    uint8_t* fast_response = NULL;
+    size_t fast_response_len = 0;
 
-    if (static_resp != NULL && static_len > 0) {
+    int fast_handled = fast_router_try_handle_full(
+        result.method, result.method_len, result.path, result.path_len,
+        &fast_response, &fast_response_len);
+
+    if (fast_handled == 0 && fast_response != NULL && fast_response_len > 0) {
       conn->headers_sent = true;
-      server_write(NULL, conn, static_resp, static_len);
+      conn_write(ctx, conn, fast_response, fast_response_len);
       return;
     }
 
@@ -551,7 +655,6 @@ static void* event_loop_thread(void* arg) {
           handle_send_completion(ctx, (connection_t*)data->ptr, res);
           break;
       }
-      free(data);
     }
 
     io_uring_cqe_seen(&ctx->ring, cqe);
@@ -571,6 +674,10 @@ server_handle_t server_init(const server_config_t* config,
                             void* user_data) {
   server_handle_t server = calloc(1, sizeof(*server));
   if (server == NULL) return NULL;
+
+  /* Initialize fast router */
+  fast_router_init();
+  fast_router_register_defaults();
 
   uring_context_t* ctx = &server->ctx;
 
@@ -685,7 +792,6 @@ int server_send_response(server_handle_t server, connection_t* conn,
   if (server == NULL || conn == NULL || response == NULL) return -1;
   if (conn->fd < 0) return -1;
 
-  /* Format response - same as kqueue for now */
   uint8_t buf[16384];
   size_t len;
 
@@ -697,15 +803,19 @@ int server_send_response(server_handle_t server, connection_t* conn,
       return -1;
     }
   } else {
-    /* Fallback to basic headers for now if custom provided */
-    len = snprintf((char*)buf, sizeof(buf),
-                   "HTTP/1.1 %d OK\r\nContent-Length: %zu\r\n\r\n",
-                   response->status_code, response->body_len);
-    if (response->body && response->body_len > 0) {
-      size_t to_copy = response->body_len;
-      if (to_copy > sizeof(buf) - len) to_copy = sizeof(buf) - len;
-      memcpy(buf + len, response->body, to_copy);
-      len += to_copy;
+    /* Robust header formatting */
+    const char* headers[128];
+    size_t count = response->header_count;
+    if (count > 64) count = 64;
+
+    for (size_t i = 0; i < count * 2; i++) {
+      headers[i] = response->headers[i];
+    }
+
+    if (format_http_response(response->status_code, headers, count,
+                             response->body, response->body_len, buf,
+                             sizeof(buf), &len) < 0) {
+      return -1;
     }
   }
 
@@ -715,33 +825,8 @@ int server_send_response(server_handle_t server, connection_t* conn,
 
 int server_write(server_handle_t server, connection_t* conn, const void* data,
                  size_t len) {
-  if (conn == NULL || data == NULL || len == 0) return -1;
-
-  /* Append to output buffer */
-  if (conn->out_buffer_len + len > conn->out_buffer_cap) {
-    size_t new_cap =
-        conn->out_buffer_cap == 0 ? 16384 : conn->out_buffer_cap * 2;
-    while (new_cap < conn->out_buffer_len + len) new_cap *= 2;
-    uint8_t* new_buf = realloc(conn->out_buffer, new_cap);
-    if (!new_buf) return -1;
-    conn->out_buffer = new_buf;
-    conn->out_buffer_cap = new_cap;
-  }
-
-  memcpy(conn->out_buffer + conn->out_buffer_len, data, len);
-  conn->out_buffer_len += len;
-
-  /* If this is the only data, arm the send */
-  if (conn->out_buffer_len == len) {
-    uring_context_t* ctx = server ? &server->ctx : NULL;
-    /* If called from callback where ctx isn't available, we'll need it later */
-    /* For io_uring, we always arm the send immediately if possible */
-    if (ctx) {
-      arm_send(ctx, conn);
-    }
-  }
-
-  return 0;
+  if (server == NULL || conn == NULL || data == NULL || len == 0) return -1;
+  return conn_write(&server->ctx, conn, data, len);
 }
 
 ssize_t server_read_body(server_handle_t server, connection_t* conn,
@@ -771,7 +856,7 @@ connection_t* server_get_connection_by_fd(server_handle_t server, int fd) {
 
 const char* server_get_platform(void) { return "io_uring"; }
 
-const char* server_get_version(void) { return "1.0.0"; }
+const char* server_get_version(void) { return "1.1.0"; }
 
 #else
 
@@ -811,6 +896,6 @@ ssize_t server_read_body(server_handle_t server, connection_t* conn,
   return -1;
 }
 const char* server_get_platform(void) { return "stub"; }
-const char* server_get_version(void) { return "1.0.0"; }
+const char* server_get_version(void) { return "1.1.0"; }
 
 #endif

@@ -151,6 +151,10 @@ typedef struct {
   size_t out_buffer_cap;
   size_t out_buffer_len;
   size_t out_buffer_pos;
+
+  /** Platform-specific SQE data to avoid heap allocations in hot path */
+  void* platform_sqe_data_recv;
+  void* platform_sqe_data_send;
 } connection_t;
 
 /**
