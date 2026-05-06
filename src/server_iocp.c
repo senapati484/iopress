@@ -29,7 +29,6 @@
  * ============================================================================
  */
 
-#define MAX_CONNECTIONS 65535
 #define BUFFER_SIZE 8192
 #define MAX_PIPELINE_BATCH 64
 #define MAX_ACCEPT_BATCH 512
@@ -68,6 +67,9 @@ typedef struct {
   connection_t* connections;
   size_t max_connections;
   CRITICAL_SECTION cs;
+
+  /* SQE data recycling to avoid malloc in hot path */
+  iocp_overlapped_t accept_ov;
 } iocp_context_t;
 
 struct server_handle_s {
@@ -116,64 +118,170 @@ static int set_socket_options(SOCKET fd) {
 }
 
 /* ============================================================================
- * Pre-computed Responses
+ * Helper Functions
  * ============================================================================
  */
 
-static const char RESPONSE_200_JSON_EMPTY[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 2\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{}";
+static char* fast_itoa_size(size_t val, char* buf) {
+  char tmp[16];
+  int i = 0;
+  if (val == 0) {
+    buf[0] = '0';
+    buf[1] = '\0';
+    return buf;
+  }
+  while (val > 0) {
+    tmp[i++] = '0' + (val % 10);
+    val /= 10;
+  }
+  for (int j = 0; j < i; j++) {
+    buf[j] = tmp[i - 1 - j];
+  }
+  buf[i] = '\0';
+  return buf;
+}
 
-static const char RESPONSE_200_JSON_HEALTH[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 15\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: application/json\r\n"
-    "\r\n"
-    "{\"status\":\"ok\"}";
+static char* fast_itoa(uint16_t val, char* buf) {
+  return fast_itoa_size((size_t)val, buf);
+}
 
-static const char RESPONSE_200_PING[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 4\r\n"
-    "Connection: keep-alive\r\n"
-    "Content-Type: text/plain\r\n"
-    "\r\n"
-    "pong";
+static int format_http_response_fast(int status_code, const uint8_t* body,
+                                     size_t body_len, uint8_t* out,
+                                     size_t out_cap, size_t* out_len) {
+  (void)out_cap;
 
-static const char RESPONSE_404[] =
-    "HTTP/1.1 404 Not Found\r\n"
-    "Content-Length: 9\r\n"
-    "Connection: close\r\n"
-    "\r\n"
-    "Not Found";
+  /* Fast status line - optimized for common cases */
+  out[0] = 'H';
+  out[1] = 'T';
+  out[2] = 'T';
+  out[3] = 'P';
+  out[4] = '/';
+  out[5] = '1';
+  out[6] = '.';
+  out[7] = '1';
+  out[8] = ' ';
+  char* p = (char*)out + 9;
 
-static const char* get_static_response(const char* path, size_t path_len,
-                                       size_t* out_len) {
-  switch (path_len) {
-    case 1:
-      if (path[0] == '/') {
-        *out_len = sizeof(RESPONSE_200_JSON_EMPTY) - 1;
-        return RESPONSE_200_JSON_EMPTY;
-      }
+  if (status_code == 200) {
+    p[0] = '2';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'O';
+    p[5] = 'K';
+    p += 6;
+  } else if (status_code == 404) {
+    p[0] = '4';
+    p[1] = '0';
+    p[2] = '4';
+    p[3] = ' ';
+    p[4] = 'N';
+    p[5] = 'o';
+    p[6] = 't';
+    p[7] = ' ';
+    p[8] = 'F';
+    p[9] = 'o';
+    p[10] = 'u';
+    p[11] = 'n';
+    p[12] = 'd';
+    p += 13;
+  } else if (status_code == 400) {
+    p[0] = '4';
+    p[1] = '0';
+    p[2] = '0';
+    p[3] = ' ';
+    p[4] = 'B';
+    p[5] = 'a';
+    p[6] = 'd';
+    p[7] = ' ';
+    p[8] = 'R';
+    p[9] = 'e';
+    p[10] = 'q';
+    p[11] = 'u';
+    p[12] = 'e';
+    p[13] = 's';
+    p[14] = 't';
+    p += 15;
+  } else {
+    fast_itoa((uint16_t)status_code, p);
+    while (*p) p++;
+    *p++ = ' ';
+    const char* sp = "OK";
+    while (*sp) *p++ = *sp++;
+  }
+
+  /* Content-Length header */
+  *p++ = '\r';
+  *p++ = '\n';
+  const char* cl = "Content-Length: ";
+  while (*cl) *p++ = *cl++;
+  fast_itoa_size(body_len, p);
+  while (*p) p++;
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* End headers */
+  *p++ = '\r';
+  *p++ = '\n';
+
+  /* Body */
+  if (body_len > 0 && body != NULL) {
+    memcpy(p, body, body_len);
+    p += body_len;
+  }
+
+  *out_len = p - (char*)out;
+  return 0;
+}
+
+static int format_http_response(int status_code, const char** headers,
+                                size_t header_count, const uint8_t* body,
+                                size_t body_len, uint8_t* out, size_t out_cap,
+                                size_t* out_len) {
+  const char* status_text = "OK";
+  switch (status_code) {
+    case 200:
+      status_text = "OK";
       break;
-    case 5:
-      if (memcmp(path, "/ping", 5) == 0) {
-        *out_len = sizeof(RESPONSE_200_PING) - 1;
-        return RESPONSE_200_PING;
-      }
+    case 201:
+      status_text = "Created";
       break;
-    case 7:
-      if (memcmp(path, "/health", 7) == 0) {
-        *out_len = sizeof(RESPONSE_200_JSON_HEALTH) - 1;
-        return RESPONSE_200_JSON_HEALTH;
-      }
+    case 400:
+      status_text = "Bad Request";
+      break;
+    case 404:
+      status_text = "Not Found";
+      break;
+    case 500:
+      status_text = "Internal Server Error";
       break;
   }
-  return NULL;
+
+  int len = snprintf((char*)out, out_cap, "HTTP/1.1 %d %s\r\n", status_code,
+                     status_text);
+  if (len < 0) return -1;
+  char* p = (char*)out + len;
+
+  for (size_t i = 0; i < header_count * 2; i += 2) {
+    len = snprintf(p, (int)(out_cap - (p - (char*)out)), "%s: %s\r\n",
+                   headers[i], headers[i + 1]);
+    if (len < 0) return -1;
+    p += len;
+  }
+
+  len = snprintf(p, (int)(out_cap - (p - (char*)out)),
+                 "Content-Length: %zu\r\n\r\n", body_len);
+  if (len < 0) return -1;
+  p += len;
+
+  if (body_len > 0 && body != NULL) {
+    if ((size_t)(p - (char*)out) + body_len > out_cap) return -1;
+    memcpy(p, body, body_len);
+    p += body_len;
+  }
+
+  *out_len = p - (char*)out;
+  return 0;
 }
 
 /* ============================================================================
@@ -183,8 +291,85 @@ static const char* get_static_response(const char* path, size_t path_len,
 
 static connection_t* get_connection(connection_t* pool, size_t pool_size,
                                     SOCKET fd) {
-  if (fd < 0 || (size_t)fd >= pool_size) return NULL;
-  return &pool[fd];
+  if (fd == INVALID_SOCKET || (size_t)fd >= pool_size) return NULL;
+  connection_t* conn = &pool[fd];
+  if (conn->fd == INVALID_SOCKET) {
+    memset(conn, 0, sizeof(*conn));
+    conn->fd = (int)fd;
+    conn->buffer_cap = DEFAULT_INITIAL_BUFFER_SIZE;
+    conn->buffer = malloc(conn->buffer_cap);
+    if (conn->buffer == NULL) return NULL;
+
+    /* Pre-allocate overlapped objects to avoid malloc in hot path */
+    iocp_overlapped_t* recv_ov = malloc(sizeof(iocp_overlapped_t));
+    if (recv_ov) {
+      memset(recv_ov, 0, sizeof(iocp_overlapped_t));
+      recv_ov->type = OP_RECV;
+      recv_ov->conn = conn;
+      recv_ov->socket = fd;
+      conn->platform_sqe_data_recv = recv_ov;
+    }
+  }
+  return conn;
+}
+
+static void reset_connection(connection_t* conn) {
+  if (conn == NULL) return;
+  conn->buffer_len = 0;
+  conn->buffer_pos = 0;
+  conn->body_remaining = 0;
+  conn->streaming = false;
+  conn->keep_alive = true;
+  conn->request_complete = false;
+  conn->headers_sent = false;
+  conn->user_data = NULL;
+
+  /* Reset output buffer state but keep allocation for reuse */
+  conn->out_buffer_len = 0;
+  conn->out_buffer_pos = 0;
+}
+
+static void close_connection(iocp_context_t* ctx, SOCKET fd) {
+  if (fd == INVALID_SOCKET) return;
+
+  connection_t* conn = &ctx->connections[fd];
+  if (conn->fd != INVALID_SOCKET) {
+    if (ctx->on_connection) {
+      ctx->on_connection(conn, 1, ctx->user_data);
+    }
+
+    closesocket(fd);
+    conn->fd = INVALID_SOCKET;
+    conn->closed = true;
+
+    if (conn->buffer) {
+      free(conn->buffer);
+      conn->buffer = NULL;
+    }
+    conn->buffer_cap = 0;
+
+    /* Free output buffer */
+    if (conn->out_buffer) {
+      free(conn->out_buffer);
+      conn->out_buffer = NULL;
+    }
+    conn->out_buffer_cap = 0;
+    conn->out_buffer_len = 0;
+    conn->out_buffer_pos = 0;
+
+    /* Cleanup platform_sqe_data */
+    if (conn->platform_sqe_data_recv) {
+      free(conn->platform_sqe_data_recv);
+      conn->platform_sqe_data_recv = NULL;
+    }
+    if (conn->platform_sqe_data_send) {
+      /* SEND objects are usually dynamically allocated per write in IOCP
+       * because multiple sends can be outstanding. We cleanup any
+       * remaining one if it was somehow cached. */
+      free(conn->platform_sqe_data_send);
+      conn->platform_sqe_data_send = NULL;
+    }
+  }
 }
 
 /* ============================================================================
@@ -206,10 +391,9 @@ static DWORD WINAPI worker_thread(LPVOID param) {
       if (overlap) {
         iocp_overlapped_t* ov = (iocp_overlapped_t*)overlap;
         if (ov->conn && ov->conn->fd != INVALID_SOCKET) {
-          closesocket(ov->conn->fd);
-          ov->conn->fd = -1;
+          close_connection(ctx, (SOCKET)ov->conn->fd);
         }
-        free(ov);
+        if (ov->type == OP_SEND) free(ov);
       }
       continue;
     }
@@ -227,7 +411,7 @@ static DWORD WINAPI worker_thread(LPVOID param) {
           connection_t* conn =
               get_connection(ctx->connections, ctx->max_connections, client);
           if (conn) {
-            conn->fd = client;
+            conn->fd = (int)client;
             if (ctx->on_connection) {
               ctx->on_connection(conn, 0, ctx->user_data);
             }
@@ -235,11 +419,11 @@ static DWORD WINAPI worker_thread(LPVOID param) {
             CreateIoCompletionPort((HANDLE)client, ctx->iocp, (ULONG_PTR)conn,
                                    0);
 
-            iocp_overlapped_t* next_ov = malloc(sizeof(iocp_overlapped_t));
+            /* Use pre-allocated RECV object */
+            iocp_overlapped_t* next_ov =
+                (iocp_overlapped_t*)conn->platform_sqe_data_recv;
             if (next_ov) {
-              memset(next_ov, 0, sizeof(iocp_overlapped_t));
-              next_ov->type = OP_RECV;
-              next_ov->conn = conn;
+              memset(&next_ov->overlapped, 0, sizeof(OVERLAPPED));
               next_ov->wsabuf.buf = next_ov->buffer;
               next_ov->wsabuf.len = BUFFER_SIZE;
 
@@ -252,16 +436,14 @@ static DWORD WINAPI worker_thread(LPVOID param) {
             closesocket(client);
           }
         }
-        free(ov);
+        /* ACCEPT object is static in context, don't free */
         break;
       }
 
       case OP_RECV: {
         connection_t* conn = (connection_t*)key;
         if (bytes_transferred == 0) {
-          closesocket(conn->fd);
-          conn->fd = -1;
-          free(ov);
+          close_connection(ctx, (SOCKET)conn->fd);
           continue;
         }
 
@@ -272,38 +454,57 @@ static DWORD WINAPI worker_thread(LPVOID param) {
                                         conn->buffer_len, &result);
 
         if (status == PARSE_STATUS_DONE) {
-          size_t static_len = 0;
-          const char* static_resp =
-              get_static_response(result.path, result.path_len, &static_len);
-          if (static_resp) {
-            server_write(NULL, conn, static_resp, static_len);
+          conn->request_complete = true;
+          conn->keep_alive = result.http_minor >= 1;
+
+          /* ULTRA FAST PATH: Check dynamic fast router first */
+          uint8_t* fast_response = NULL;
+          size_t fast_response_len = 0;
+
+          int fast_handled = fast_router_try_handle_full(
+              result.method, result.method_len, result.path, result.path_len,
+              &fast_response, &fast_response_len);
+
+          if (fast_handled == 0 && fast_response != NULL &&
+              fast_response_len > 0) {
+            conn->headers_sent = true;
+            server_write(NULL, conn, fast_response, fast_response_len);
           } else if (ctx->on_request) {
             ctx->on_request(conn, &result, ctx->user_data);
           }
         } else if (status == PARSE_STATUS_ERROR) {
-          server_write(NULL, conn, RESPONSE_404, sizeof(RESPONSE_404) - 1);
-          closesocket(conn->fd);
-          conn->fd = -1;
-          free(ov);
+          const char* headers[] = {"Connection", "close", NULL};
+          uint8_t response[256];
+          size_t response_len;
+          format_http_response(400, headers, 2, NULL, 0, response,
+                               sizeof(response), &response_len);
+          server_write(NULL, conn, response, response_len);
+          close_connection(ctx, (SOCKET)conn->fd);
           continue;
         }
 
-        /* Re-arm RECV */
-        memset(ov, 0, sizeof(iocp_overlapped_t));
-        ov->type = OP_RECV;
-        ov->conn = conn;
+        /* Re-arm RECV using the same object */
+        memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
         ov->wsabuf.buf = ov->buffer;
         ov->wsabuf.len = BUFFER_SIZE;
 
         DWORD received = 0;
         DWORD flags = 0;
-        WSARecv(conn->fd, &ov->wsabuf, 1, &received, &flags, &ov->overlapped,
-                NULL);
+        WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,
+                &ov->overlapped, NULL);
         break;
       }
 
       case OP_SEND: {
-        /* Send completion - cleanup */
+        /* Send completion - cleanup dynamic SEND object */
+        connection_t* conn = (connection_t*)key;
+        if (bytes_transferred > 0) {
+          /* Handle completion/reset if needed */
+          if (conn->request_complete && conn->headers_sent &&
+              !conn->keep_alive) {
+            close_connection(ctx, (SOCKET)conn->fd);
+          }
+        }
         free(ov);
         break;
       }
@@ -333,6 +534,10 @@ server_handle_t server_init(const server_config_t* config,
     return NULL;
   }
 
+  /* Initialize fast router */
+  fast_router_init();
+  fast_router_register_defaults();
+
   iocp_context_t* ctx = &server->ctx;
 
   ctx->config = *config;
@@ -347,6 +552,10 @@ server_handle_t server_init(const server_config_t* config,
     free(server);
     WSACleanup();
     return NULL;
+  }
+
+  for (size_t i = 0; i < ctx->max_connections; i++) {
+    ctx->connections[i].fd = (int)INVALID_SOCKET;
   }
 
   InitializeCriticalSection(&ctx->cs);
@@ -387,6 +596,10 @@ server_handle_t server_init(const server_config_t* config,
     return NULL;
   }
 
+  /* Init static accept data */
+  memset(&ctx->accept_ov, 0, sizeof(iocp_overlapped_t));
+  ctx->accept_ov.type = OP_ACCEPT;
+
   return server;
 }
 
@@ -404,7 +617,9 @@ int server_start(server_handle_t server) {
   while (ctx->running) {
     SOCKET client = accept(ctx->listen_socket, NULL, NULL);
     if (client != INVALID_SOCKET) {
-      PostQueuedCompletionStatus(ctx->iocp, 0, 0, (LPOVERLAPPED)client);
+      iocp_overlapped_t* ov = &ctx->accept_ov;
+      ov->socket = client;
+      PostQueuedCompletionStatus(ctx->iocp, 0, 0, &ov->overlapped);
     }
     Sleep(1);
   }
@@ -436,8 +651,8 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
 
   if (ctx->connections) {
     for (size_t i = 0; i < ctx->max_connections; i++) {
-      if (ctx->connections[i].fd >= 0) {
-        closesocket(ctx->connections[i].fd);
+      if (ctx->connections[i].fd != (int)INVALID_SOCKET) {
+        close_connection(ctx, (SOCKET)ctx->connections[i].fd);
       }
     }
     free(ctx->connections);
@@ -453,23 +668,35 @@ int server_send_response(server_handle_t server, connection_t* conn,
                          const response_t* response) {
   if (conn == NULL || response == NULL) return -1;
 
-  char buf[16384];
-  int len = snprintf(buf, sizeof(buf),
-                     "HTTP/1.1 %d OK\r\n"
-                     "Content-Length: %zu\r\n"
-                     "Connection: %s\r\n"
-                     "\r\n",
-                     response->status_code, response->body_len,
-                     conn->keep_alive ? "keep-alive" : "close");
+  uint8_t buf[16384];
+  size_t len;
 
-  server_write(server, conn, buf, len);
+  /* Use fast path for common case (no custom headers) */
+  if (response->header_count == 0) {
+    if (format_http_response_fast(response->status_code, response->body,
+                                  response->body_len, buf, sizeof(buf),
+                                  &len) < 0) {
+      return -1;
+    }
+  } else {
+    /* Robust header formatting */
+    const char* headers[128];
+    size_t count = response->header_count;
+    if (count > 64) count = 64;
 
-  if (response->body && response->body_len > 0) {
-    server_write(server, conn, response->body, response->body_len);
+    for (size_t i = 0; i < count * 2; i++) {
+      headers[i] = response->headers[i];
+    }
+
+    if (format_http_response(response->status_code, headers, count,
+                             response->body, response->body_len, buf,
+                             sizeof(buf), &len) < 0) {
+      return -1;
+    }
   }
 
   conn->headers_sent = true;
-  return 0;
+  return server_write(server, conn, buf, len);
 }
 
 int server_write(server_handle_t server, connection_t* conn, const void* data,
@@ -489,13 +716,17 @@ int server_write(server_handle_t server, connection_t* conn, const void* data,
   ov->wsabuf.len = (ULONG)to_send;
 
   DWORD sent = 0;
-  if (WSASend(conn->fd, &ov->wsabuf, 1, &sent, 0, &ov->overlapped, NULL) ==
-      SOCKET_ERROR) {
+  if (WSASend((SOCKET)conn->fd, &ov->wsabuf, 1, &sent, 0, &ov->overlapped,
+              NULL) == SOCKET_ERROR) {
     if (WSAGetLastError() != WSA_IO_PENDING) {
       free(ov);
       return -1;
     }
   }
+
+  /* If there's more data, we should handle it.
+   * For now, this implementation is simplified.
+   * In a real high-perf scenario, we'd queue the remainder. */
 
   return 0;
 }
@@ -503,20 +734,30 @@ int server_write(server_handle_t server, connection_t* conn, const void* data,
 ssize_t server_read_body(server_handle_t server, connection_t* conn,
                          size_t max_bytes) {
   (void)server;
-  (void)conn;
-  (void)max_bytes;
-  return 0;
+  if (conn == NULL || conn->fd == (int)INVALID_SOCKET) return -1;
+
+  /* Simplified sync read for body if needed outside of async loop */
+  char* buf = (char*)conn->buffer + conn->buffer_len;
+  size_t space = conn->buffer_cap - conn->buffer_len;
+  if (max_bytes > 0 && max_bytes < space) space = max_bytes;
+
+  int n = recv((SOCKET)conn->fd, buf, (int)space, 0);
+  if (n > 0) conn->buffer_len += n;
+  return n;
 }
 
 connection_t* server_get_connection_by_fd(server_handle_t server, int fd) {
-  if (server == NULL || fd < 0) return NULL;
+  if (server == NULL || fd == (int)INVALID_SOCKET || fd < 0 ||
+      (size_t)fd >= server->ctx.max_connections) {
+    return NULL;
+  }
   return get_connection(server->ctx.connections, server->ctx.max_connections,
                         (SOCKET)fd);
 }
 
 const char* server_get_platform(void) { return "iocp"; }
 
-const char* server_get_version(void) { return "1.0.0"; }
+const char* server_get_version(void) { return "1.1.0"; }
 
 #else
 
@@ -566,6 +807,6 @@ connection_t* server_get_connection_by_fd(server_handle_t server, int fd) {
 
 const char* server_get_platform(void) { return "iocp"; }
 
-const char* server_get_version(void) { return "1.0.0"; }
+const char* server_get_version(void) { return "1.1.0"; }
 
 #endif
