@@ -779,6 +779,29 @@ const char* server_get_platform(void) { return "iocp"; }
 
 const char* server_get_version(void) { return "1.1.0"; }
 
+int server_pause_read(server_handle_t server, connection_t* conn) {
+  if (!server || !conn || conn->fd == (int)INVALID_SOCKET) return -1;
+  conn->processing = true;
+  return 0;
+}
+
+int server_resume_read(server_handle_t server, connection_t* conn) {
+  if (!server || !conn || conn->fd == (int)INVALID_SOCKET) return -1;
+  conn->processing = false;
+  /* Re-arm RECV immediately when resuming */
+  iocp_overlapped_t* ov = (iocp_overlapped_t*)conn->platform_sqe_data_recv;
+  if (ov) {
+    memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
+    ov->wsabuf.buf = ov->buffer;
+    ov->wsabuf.len = BUFFER_SIZE;
+    DWORD received = 0;
+    DWORD flags = 0;
+    WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,
+            &ov->overlapped, NULL);
+  }
+  return 0;
+}
+
 #else
 
 server_handle_t server_init(const server_config_t* config,
