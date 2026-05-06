@@ -35,17 +35,22 @@
 #define MAX_ACCEPT_BATCH 512
 #define WORKER_THREADS 4
 
+/* Operation types for IOCP */
+typedef enum { OP_ACCEPT, OP_RECV, OP_SEND } op_type_t;
+
 /* ============================================================================
  * Types
  * ============================================================================
  */
 
 typedef struct {
+  OVERLAPPED overlapped;
   SOCKET socket;
   WSABUF wsabuf;
   char buffer[BUFFER_SIZE];
-  DWORD bytes_received;
+  DWORD bytes_transferred;
   DWORD flags;
+  op_type_t type;
   connection_t* conn;
 } iocp_overlapped_t;
 
@@ -115,13 +120,21 @@ static int set_socket_options(SOCKET fd) {
  * ============================================================================
  */
 
-static const char RESPONSE_200_JSON[] =
+static const char RESPONSE_200_JSON_EMPTY[] =
     "HTTP/1.1 200 OK\r\n"
     "Content-Length: 2\r\n"
     "Connection: keep-alive\r\n"
     "Content-Type: application/json\r\n"
     "\r\n"
     "{}";
+
+static const char RESPONSE_200_JSON_HEALTH[] =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 15\r\n"
+    "Connection: keep-alive\r\n"
+    "Content-Type: application/json\r\n"
+    "\r\n"
+    "{\"status\":\"ok\"}";
 
 static const char RESPONSE_200_PING[] =
     "HTTP/1.1 200 OK\r\n"
@@ -143,8 +156,8 @@ static const char* get_static_response(const char* path, size_t path_len,
   switch (path_len) {
     case 1:
       if (path[0] == '/') {
-        *out_len = sizeof(RESPONSE_200_JSON) - 1;
-        return RESPONSE_200_JSON;
+        *out_len = sizeof(RESPONSE_200_JSON_EMPTY) - 1;
+        return RESPONSE_200_JSON_EMPTY;
       }
       break;
     case 5:
@@ -155,8 +168,8 @@ static const char* get_static_response(const char* path, size_t path_len,
       break;
     case 7:
       if (memcmp(path, "/health", 7) == 0) {
-        *out_len = sizeof(RESPONSE_200_JSON) - 1;
-        return RESPONSE_200_JSON;
+        *out_len = sizeof(RESPONSE_200_JSON_HEALTH) - 1;
+        return RESPONSE_200_JSON_HEALTH;
       }
       break;
   }
@@ -191,89 +204,109 @@ static DWORD WINAPI worker_thread(LPVOID param) {
 
     if (!ret) {
       if (overlap) {
-        iocp_overlapped_t* ov =
-            CONTAINING_RECORD(overlap, iocp_overlapped_t, wsabuf);
-        if (ov->conn) {
+        iocp_overlapped_t* ov = (iocp_overlapped_t*)overlap;
+        if (ov->conn && ov->conn->fd != INVALID_SOCKET) {
           closesocket(ov->conn->fd);
           ov->conn->fd = -1;
         }
+        free(ov);
       }
       continue;
     }
 
-    if (key == 0) {
-      SOCKET client = (SOCKET)overlap;
-      if (client != INVALID_SOCKET) {
-        set_socket_options(client);
-        set_nonblocking(client);
+    if (overlap == NULL) continue;
+    iocp_overlapped_t* ov = (iocp_overlapped_t*)overlap;
 
-        connection_t* conn =
-            get_connection(ctx->connections, ctx->max_connections, client);
-        if (conn) {
-          conn->fd = client;
-          if (ctx->on_connection) {
-            ctx->on_connection(conn, 0, ctx->user_data);
+    switch (ov->type) {
+      case OP_ACCEPT: {
+        SOCKET client = (SOCKET)ov->socket;
+        if (client != INVALID_SOCKET) {
+          set_socket_options(client);
+          set_nonblocking(client);
+
+          connection_t* conn =
+              get_connection(ctx->connections, ctx->max_connections, client);
+          if (conn) {
+            conn->fd = client;
+            if (ctx->on_connection) {
+              ctx->on_connection(conn, 0, ctx->user_data);
+            }
+
+            CreateIoCompletionPort((HANDLE)client, ctx->iocp, (ULONG_PTR)conn,
+                                   0);
+
+            iocp_overlapped_t* next_ov = malloc(sizeof(iocp_overlapped_t));
+            if (next_ov) {
+              memset(next_ov, 0, sizeof(iocp_overlapped_t));
+              next_ov->type = OP_RECV;
+              next_ov->conn = conn;
+              next_ov->wsabuf.buf = next_ov->buffer;
+              next_ov->wsabuf.len = BUFFER_SIZE;
+
+              DWORD received = 0;
+              DWORD flags = 0;
+              WSARecv(client, &next_ov->wsabuf, 1, &received, &flags,
+                      &next_ov->overlapped, NULL);
+            }
+          } else {
+            closesocket(client);
           }
+        }
+        free(ov);
+        break;
+      }
 
-          CreateIoCompletionPort((HANDLE)client, ctx->iocp, (ULONG_PTR)conn, 0);
+      case OP_RECV: {
+        connection_t* conn = (connection_t*)key;
+        if (bytes_transferred == 0) {
+          closesocket(conn->fd);
+          conn->fd = -1;
+          free(ov);
+          continue;
+        }
 
-          iocp_overlapped_t* ov = malloc(sizeof(iocp_overlapped_t));
-          if (ov) {
-            memset(ov, 0, sizeof(iocp_overlapped_t));
-            ov->conn = conn;
-            ov->wsabuf.buf = ov->buffer;
-            ov->wsabuf.len = BUFFER_SIZE;
-            ov->flags = 0;
+        conn->buffer_len = bytes_transferred;
 
-            DWORD received = 0;
-            WSARecv(client, &ov->wsabuf, 1, NULL, &ov->flags, &ov->wsabuf,
-                    NULL);
+        parse_result_t result;
+        int status = http_parse_request((const uint8_t*)ov->buffer,
+                                        conn->buffer_len, &result);
+
+        if (status == PARSE_STATUS_DONE) {
+          size_t static_len = 0;
+          const char* static_resp =
+              get_static_response(result.path, result.path_len, &static_len);
+          if (static_resp) {
+            server_write(NULL, conn, static_resp, static_len);
+          } else if (ctx->on_request) {
+            ctx->on_request(conn, &result, ctx->user_data);
           }
-        } else {
-          closesocket(client);
+        } else if (status == PARSE_STATUS_ERROR) {
+          server_write(NULL, conn, RESPONSE_404, sizeof(RESPONSE_404) - 1);
+          closesocket(conn->fd);
+          conn->fd = -1;
+          free(ov);
+          continue;
         }
-      }
-    } else if (overlap) {
-      connection_t* conn = (connection_t*)key;
-      iocp_overlapped_t* ov =
-          CONTAINING_RECORD(overlap, iocp_overlapped_t, wsabuf);
 
-      if (bytes_transferred == 0) {
-        closesocket(conn->fd);
-        conn->fd = -1;
+        /* Re-arm RECV */
+        memset(ov, 0, sizeof(iocp_overlapped_t));
+        ov->type = OP_RECV;
+        ov->conn = conn;
+        ov->wsabuf.buf = ov->buffer;
+        ov->wsabuf.len = BUFFER_SIZE;
+
+        DWORD received = 0;
+        DWORD flags = 0;
+        WSARecv(conn->fd, &ov->wsabuf, 1, &received, &flags, &ov->overlapped,
+                NULL);
+        break;
+      }
+
+      case OP_SEND: {
+        /* Send completion - cleanup */
         free(ov);
-        continue;
+        break;
       }
-
-      conn->buffer_len = bytes_transferred;
-
-      parse_result_t result;
-      int status = http_parse_request((const uint8_t*)ov->buffer,
-                                      conn->buffer_len, &result);
-
-      if (status == PARSE_STATUS_DONE) {
-        size_t static_len = 0;
-        const char* static_resp =
-            get_static_response(result.path, result.path_len, &static_len);
-        if (static_resp) {
-          send(conn->fd, static_resp, static_len, 0);
-        } else if (ctx->on_request) {
-          ctx->on_request(conn, &result, ctx->user_data);
-        }
-      } else if (status == PARSE_STATUS_ERROR) {
-        send(conn->fd, RESPONSE_404, sizeof(RESPONSE_404) - 1, 0);
-        closesocket(conn->fd);
-        conn->fd = -1;
-        free(ov);
-        continue;
-      }
-
-      memset(ov, 0, sizeof(iocp_overlapped_t));
-      ov->conn = conn;
-      ov->wsabuf.buf = ov->buffer;
-      ov->wsabuf.len = BUFFER_SIZE;
-
-      WSARecv(conn->fd, &ov->wsabuf, 1, NULL, &ov->flags, &ov->wsabuf, NULL);
     }
   }
 
@@ -418,9 +451,52 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
 
 int server_send_response(server_handle_t server, connection_t* conn,
                          const response_t* response) {
-  (void)server;
-  (void)conn;
-  (void)response;
+  if (conn == NULL || response == NULL) return -1;
+
+  char buf[16384];
+  int len = snprintf(buf, sizeof(buf),
+                     "HTTP/1.1 %d OK\r\n"
+                     "Content-Length: %zu\r\n"
+                     "Connection: %s\r\n"
+                     "\r\n",
+                     response->status_code, response->body_len,
+                     conn->keep_alive ? "keep-alive" : "close");
+
+  server_write(server, conn, buf, len);
+
+  if (response->body && response->body_len > 0) {
+    server_write(server, conn, response->body, response->body_len);
+  }
+
+  conn->headers_sent = true;
+  return 0;
+}
+
+int server_write(server_handle_t server, connection_t* conn, const void* data,
+                 size_t len) {
+  if (conn == NULL || data == NULL || len == 0) return -1;
+
+  iocp_overlapped_t* ov = malloc(sizeof(iocp_overlapped_t));
+  if (!ov) return -1;
+
+  memset(ov, 0, sizeof(iocp_overlapped_t));
+  ov->type = OP_SEND;
+  ov->conn = conn;
+
+  size_t to_send = len > BUFFER_SIZE ? BUFFER_SIZE : len;
+  memcpy(ov->buffer, data, to_send);
+  ov->wsabuf.buf = ov->buffer;
+  ov->wsabuf.len = (ULONG)to_send;
+
+  DWORD sent = 0;
+  if (WSASend(conn->fd, &ov->wsabuf, 1, &sent, 0, &ov->overlapped, NULL) ==
+      SOCKET_ERROR) {
+    if (WSAGetLastError() != WSA_IO_PENDING) {
+      free(ov);
+      return -1;
+    }
+  }
+
   return 0;
 }
 
@@ -433,9 +509,9 @@ ssize_t server_read_body(server_handle_t server, connection_t* conn,
 }
 
 connection_t* server_get_connection_by_fd(server_handle_t server, int fd) {
-  if (fd < 0) return NULL;
+  if (server == NULL || fd < 0) return NULL;
   return get_connection(server->ctx.connections, server->ctx.max_connections,
-                        fd);
+                        (SOCKET)fd);
 }
 
 const char* server_get_platform(void) { return "iocp"; }

@@ -145,6 +145,12 @@ typedef struct {
   /** Assembled chunked body (malloc'd, freed after request) */
   uint8_t* assembled_body;
   size_t assembled_body_len;
+
+  /** Output buffer for partial writes */
+  uint8_t* out_buffer;
+  size_t out_buffer_cap;
+  size_t out_buffer_len;
+  size_t out_buffer_pos;
 } connection_t;
 
 /**
@@ -316,6 +322,18 @@ int server_stop(server_handle_t server, uint32_t timeout_ms);
  */
 int server_send_response(server_handle_t server, connection_t* conn,
                          const response_t* response);
+
+/**
+ * Low-level write to a connection with partial write queuing.
+ *
+ * @param server Server handle
+ * @param conn Connection handle
+ * @param data Data to send
+ * @param len Data length
+ * @return 0 on success, -1 on error
+ */
+int server_write(server_handle_t server, connection_t* conn, const void* data,
+                 size_t len);
 
 /**
  * Get connection by file descriptor.

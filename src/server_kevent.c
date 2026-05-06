@@ -273,6 +273,10 @@ static void reset_connection(connection_t* conn) {
   conn->request_complete = false;
   conn->headers_sent = false;
   conn->user_data = NULL;
+
+  /* Reset output buffer state but keep allocation for reuse */
+  conn->out_buffer_len = 0;
+  conn->out_buffer_pos = 0;
 }
 
 static void close_connection(kevent_context_t* ctx, int fd) {
@@ -296,6 +300,15 @@ static void close_connection(kevent_context_t* ctx, int fd) {
     conn->buffer = NULL;
     conn->buffer_cap = 0;
     conn->uses_pool_buffer = 0;
+
+    /* Free output buffer */
+    if (conn->out_buffer) {
+      free(conn->out_buffer);
+      conn->out_buffer = NULL;
+    }
+    conn->out_buffer_cap = 0;
+    conn->out_buffer_len = 0;
+    conn->out_buffer_pos = 0;
   }
 }
 
@@ -312,6 +325,14 @@ static const uint8_t RESPONSE_200_JSON_EMPTY[] =
     "Content-Type: application/json\r\n"
     "\r\n"
     "{}";
+
+static const uint8_t RESPONSE_200_JSON_HEALTH[] =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 15\r\n"
+    "Connection: keep-alive\r\n"
+    "Content-Type: application/json\r\n"
+    "\r\n"
+    "{\"status\":\"ok\"}";
 
 static const uint8_t RESPONSE_200_PING[] =
     "HTTP/1.1 200 OK\r\n"
@@ -354,6 +375,8 @@ static const uint8_t RESPONSE_200_SEARCH[] =
 
 static const size_t RESPONSE_200_JSON_EMPTY_LEN =
     sizeof(RESPONSE_200_JSON_EMPTY) - 1;
+static const size_t RESPONSE_200_JSON_HEALTH_LEN =
+    sizeof(RESPONSE_200_JSON_HEALTH) - 1;
 static const size_t RESPONSE_200_PING_LEN = sizeof(RESPONSE_200_PING) - 1;
 static const size_t RESPONSE_404_LEN = sizeof(RESPONSE_404) - 1;
 static const size_t RESPONSE_200_USERS_LEN = sizeof(RESPONSE_200_USERS) - 1;
@@ -361,8 +384,14 @@ static const size_t RESPONSE_200_ECHO_LEN = sizeof(RESPONSE_200_ECHO) - 1;
 static const size_t RESPONSE_200_SEARCH_LEN = sizeof(RESPONSE_200_SEARCH) - 1;
 
 /* Pre-computed response lookup - optimized for common paths */
-static const uint8_t* get_static_response(const char* path, size_t path_len,
+static const uint8_t* get_static_response(const char* method, size_t method_len,
+                                          const char* path, size_t path_len,
                                           size_t* out_len) {
+  /* Fast path only handles GET for static pre-computed responses */
+  if (method_len != 3 || memcmp(method, "GET", 3) != 0) {
+    return NULL;
+  }
+
   /* Direct lookup for most common endpoints - O(1) */
   switch (path_len) {
     case 1:
@@ -389,8 +418,8 @@ static const uint8_t* get_static_response(const char* path, size_t path_len,
       break;
     case 7:
       if (memcmp(path, "/health", 7) == 0) {
-        *out_len = RESPONSE_200_JSON_EMPTY_LEN;
-        return RESPONSE_200_JSON_EMPTY;
+        *out_len = RESPONSE_200_JSON_HEALTH_LEN;
+        return RESPONSE_200_JSON_HEALTH;
       }
       if (memcmp(path, "/search", 7) == 0) {
         *out_len = RESPONSE_200_SEARCH_LEN;
@@ -610,6 +639,105 @@ static int format_http_response(int status_code, const char** headers,
  * ============================================================================
  */
 
+static int conn_write(kevent_context_t* ctx, connection_t* conn,
+                      const void* data, size_t len) {
+  /* 1. If there's already data in the queue, we must append to maintain order
+   */
+  if (conn->out_buffer_len > 0) {
+    size_t remaining = len;
+    if (conn->out_buffer_len + remaining > conn->out_buffer_cap) {
+      size_t new_cap =
+          conn->out_buffer_cap == 0 ? 16384 : conn->out_buffer_cap * 2;
+      while (new_cap < conn->out_buffer_len + remaining) new_cap *= 2;
+      uint8_t* new_buf = realloc(conn->out_buffer, new_cap);
+      if (!new_buf) return -1;
+      conn->out_buffer = new_buf;
+      conn->out_buffer_cap = new_cap;
+    }
+    memcpy(conn->out_buffer + conn->out_buffer_len, (const uint8_t*)data,
+           remaining);
+    conn->out_buffer_len += remaining;
+    return 0;
+  }
+
+  /* 2. Try immediate write */
+  ssize_t n = write(conn->fd, data, len);
+
+  if (n < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+      n = 0;
+    else
+      return -1;
+  }
+
+  if ((size_t)n < len) {
+    /* 3. Queue remaining data */
+    size_t remaining = len - n;
+    if (conn->out_buffer_len + remaining > conn->out_buffer_cap) {
+      size_t new_cap =
+          conn->out_buffer_cap == 0 ? 16384 : conn->out_buffer_cap * 2;
+      while (new_cap < conn->out_buffer_len + remaining) new_cap *= 2;
+      uint8_t* new_buf = realloc(conn->out_buffer, new_cap);
+      if (!new_buf) return -1;
+      conn->out_buffer = new_buf;
+      conn->out_buffer_cap = new_cap;
+    }
+    memcpy(conn->out_buffer + conn->out_buffer_len, (const uint8_t*)data + n,
+           remaining);
+    conn->out_buffer_len += remaining;
+
+    /* 4. Register for write events */
+    struct kevent ev;
+    EV_SET(&ev, conn->fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_CLEAR, 0, 0,
+           conn);
+    kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+  }
+
+  return 0;
+}
+
+int server_write(server_handle_t server, connection_t* conn, const void* data,
+                 size_t len) {
+  if (server == NULL || conn == NULL) return -1;
+  return conn_write(&server->ctx, conn, data, len);
+}
+
+static void handle_client_write(kevent_context_t* ctx, int fd,
+                                connection_t* conn) {
+  if (conn->out_buffer_len == 0) return;
+
+  ssize_t n = write(fd, conn->out_buffer + conn->out_buffer_pos,
+                    conn->out_buffer_len - conn->out_buffer_pos);
+
+  if (n < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return;
+    close_connection(ctx, fd);
+    return;
+  }
+
+  conn->out_buffer_pos += n;
+
+  if (conn->out_buffer_pos == conn->out_buffer_len) {
+    /* All data sent */
+    conn->out_buffer_pos = 0;
+    conn->out_buffer_len = 0;
+
+    /* Disable write events */
+    struct kevent ev;
+    EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+
+    /* Handle keep-alive/reset if request was complete and headers sent */
+    if (conn->request_complete && conn->headers_sent) {
+      if (!conn->keep_alive) {
+        close_connection(ctx, fd);
+      } else {
+        reset_connection(conn);
+      }
+    }
+  }
+}
+
 static void handle_new_connection(kevent_context_t* ctx) {
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
@@ -705,7 +833,7 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
   /* B5: HTTP Pipeline batching - process multiple requests in a loop */
   int requests_processed = 0;
   const int max_pipeline_batch =
-      64; /* Process up to 64 pipelined requests per event */
+      128; /* Process up to 128 pipelined requests per event */
 
   while (requests_processed < max_pipeline_batch) {
     /* Try to parse request */
@@ -719,7 +847,7 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
       size_t response_len;
       format_http_response(400, headers, 2, NULL, 0, response, sizeof(response),
                            &response_len);
-      write(fd, response, response_len);
+      conn_write(ctx, conn, response, response_len);
       close_connection(ctx, fd);
       return;
     }
@@ -735,9 +863,10 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
        */
       size_t static_len = 0;
       const uint8_t* static_resp =
-          get_static_response(result.path, result.path_len, &static_len);
+          get_static_response(result.method, result.method_len, result.path,
+                              result.path_len, &static_len);
       if (static_resp != NULL && static_len > 0) {
-        write(fd, static_resp, static_len);
+        conn_write(ctx, conn, static_resp, static_len);
 
         requests_processed++;
         size_t consumed = result.bytes_consumed;
@@ -779,7 +908,7 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
 
       if (fast_handled == 0 && fast_response != NULL && fast_response_len > 0) {
         /* Ultra fast path - write pre-built response directly */
-        write(fd, fast_response, fast_response_len);
+        conn_write(ctx, conn, fast_response, fast_response_len);
 
         requests_processed++;
 
@@ -918,7 +1047,7 @@ static void* event_loop_thread(void* arg) {
       if ((int)ev->ident == ctx->listen_fd) {
         /* New connection - accept all pending with edge-triggered efficiency */
         int accepted = 0;
-        while (accepted < 512) {
+        while (accepted < 2048) {
           struct sockaddr_in client_addr;
           socklen_t addr_len = sizeof(client_addr);
           int client_fd =
@@ -956,11 +1085,17 @@ static void* event_loop_thread(void* arg) {
           kevent(ctx->kq, new_evs, new_ev_count, NULL, 0, NULL);
           new_ev_count = 0;
         }
-      } else {
+      } else if (ev->filter == EVFILT_READ) {
         /* Client socket readable - process all available data */
         connection_t* conn = (connection_t*)ev->udata;
         if (conn && conn->fd == (int)ev->ident) {
           handle_client_read(ctx, ev->ident, conn);
+        }
+      } else if (ev->filter == EVFILT_WRITE) {
+        /* Client socket writable - process pending output */
+        connection_t* conn = (connection_t*)ev->udata;
+        if (conn && conn->fd == (int)ev->ident) {
+          handle_client_write(ctx, ev->ident, conn);
         }
       }
     }
@@ -995,7 +1130,7 @@ server_handle_t server_init(const server_config_t* config,
     return server;
   }
   if (ctx->config.backlog == 0) {
-    ctx->config.backlog = 511;
+    ctx->config.backlog = 4096;  // Increased from 511
   }
 
   /* Default reuse_port based on worker mode */
@@ -1167,20 +1302,18 @@ int server_send_response(server_handle_t server, connection_t* conn,
   }
 
   /* Write response */
-  ssize_t written = write(conn->fd, buf, len);
-  if (written < 0) return -1;
+  if (conn_write(&server->ctx, conn, buf, len) < 0) return -1;
 
   conn->headers_sent = true;
 
-  /* Close connection if not keep-alive, otherwise reset for next request */
-  if (!conn->keep_alive) {
-    close_connection(&server->ctx, conn->fd);
-  } else {
-    /* Reset buffer for next request on keep-alive connection */
-    conn->buffer_len = 0;
-    conn->buffer_pos = 0;
-    conn->request_complete = false;
-    conn->headers_sent = false;
+  /* Handle completion if all data was sent immediately */
+  if (conn->out_buffer_len == 0) {
+    /* Close connection if not keep-alive, otherwise reset for next request */
+    if (!conn->keep_alive) {
+      close_connection(&server->ctx, conn->fd);
+    } else {
+      reset_connection(conn);
+    }
   }
 
   return 0;

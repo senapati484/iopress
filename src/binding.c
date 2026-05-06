@@ -660,10 +660,32 @@ napi_value SendResponse(napi_env env, napi_callback_info info) {
   napi_get_value_int32(env, args[1], &status);
 
   /* Get body */
-  char body[16384];
+  uint8_t* body_ptr = NULL;
   size_t body_len = 0;
+
   if (argc > 2 && args[2] != NULL) {
-    napi_get_value_string_utf8(env, args[2], body, sizeof(body), &body_len);
+    napi_valuetype body_type;
+    napi_typeof(env, args[2], &body_type);
+
+    if (body_type == napi_string) {
+      napi_get_value_string_utf8(env, args[2], NULL, 0, &body_len);
+      body_ptr = malloc(body_len + 1);
+      if (body_ptr) {
+        napi_get_value_string_utf8(env, args[2], (char*)body_ptr, body_len + 1,
+                                   &body_len);
+      }
+    } else {
+      bool is_buffer;
+      napi_is_buffer(env, args[2], &is_buffer);
+      if (is_buffer) {
+        void* data;
+        napi_get_buffer_info(env, args[2], &data, &body_len);
+        body_ptr = malloc(body_len);
+        if (body_ptr) {
+          memcpy(body_ptr, data, body_len);
+        }
+      }
+    }
   }
 
   /* Get headers (object with key-value pairs) */
@@ -720,20 +742,39 @@ napi_value SendResponse(napi_env env, napi_callback_info info) {
           headers_len > 0 ? headers_buf : "", body_len);
 
       /* Send headers */
-      write(conn_fd, response, len);
+      server_write(g_context.server, conn, response, len);
 
       /* Send body */
-      if (body_len > 0) {
-        write(conn_fd, body, body_len);
+      if (body_ptr && body_len > 0) {
+        server_write(g_context.server, conn, body_ptr, body_len);
       }
 
-      /* Close if not keep-alive */
+      /* Close if not keep-alive, otherwise reset for next request */
       if (!conn->keep_alive) {
         close(conn_fd);
         conn->fd = -1;
+      } else {
+        /* Reset state if all data sent immediately, otherwise
+         * handle_client_write will do it */
+        if (conn->out_buffer_len == 0) {
+          /* Reset buffer and state for next request on keep-alive connection */
+          conn->buffer_len = 0;
+          conn->buffer_pos = 0;
+          conn->request_complete = false;
+          conn->headers_sent = false;
+
+          /* Free assembled body if any */
+          if (conn->assembled_body) {
+            free(conn->assembled_body);
+            conn->assembled_body = NULL;
+            conn->assembled_body_len = 0;
+          }
+        }
       }
     }
   }
+
+  if (body_ptr) free(body_ptr);
 
   napi_value result;
   napi_get_undefined(env, &result);
