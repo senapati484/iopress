@@ -29,7 +29,7 @@ typedef enum {
 } route_type_t;
 
 /* Fast route entry */
-typedef struct {
+typedef struct fast_route_s {
   char method[8];
   char path[MAX_PATH_LEN];
   route_type_t type;
@@ -41,6 +41,7 @@ typedef struct {
   size_t full_response_len;
   char file_path[256];
   bool active;
+  struct fast_route_s* next;
 } fast_route_t;
 
 /* Router state */

@@ -51,19 +51,18 @@ static uint32_t hash_method_path(const char* method, size_t method_len,
     hash = ((hash << 5) + hash) + (uint8_t)c;
   }
   for (size_t i = 0; i < path_len && i < 64; i++) {
-    if (path[i] >= 'A' && path[i] <= 'Z') {
-      hash = ((hash << 5) + hash) + (path[i] + 32);
-    } else {
-      hash = ((hash << 5) + hash) + (uint8_t)path[i];
-    }
+    hash = ((hash << 5) + hash) + (uint8_t)path[i];
   }
   return hash & 0xFF;
 }
 
-/* Add route to hash table */
+/* Add route to hash table with collision handling */
 static void add_route_to_hash(fast_route_t* route) {
   uint32_t h = hash_method_path(route->method, strlen(route->method),
                                 route->path, strlen(route->path));
+
+  /* Use simple chaining for collisions */
+  route->next = router.hash_table[h];
   router.hash_table[h] = route;
 }
 
@@ -238,8 +237,10 @@ int fast_router_try_handle_full(const char* method, size_t method_len,
   uint32_t h = hash_method_path(method, method_len, path, path_len);
   fast_route_t* route = router.hash_table[h];
 
-  if (route && route->active) {
-    if (strncasecmp_custom(method, route->method, 7) == 0) {
+  while (route) {
+    if (route->active && strncasecmp_custom(method, route->method, 7) == 0 &&
+        strncmp(path, route->path, path_len) == 0 &&
+        route->path[path_len] == '\0') {
       if (route->type == ROUTE_TYPE_STATIC_FILE && route->file_path[0]) {
         router.fast_hits++;
         return 2;
@@ -249,6 +250,7 @@ int fast_router_try_handle_full(const char* method, size_t method_len,
       router.fast_hits++;
       return 0;
     }
+    route = route->next;
   }
 
   router.slow_falls++;
