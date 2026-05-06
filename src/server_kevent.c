@@ -788,12 +788,31 @@ static void handle_new_connection(kevent_context_t* ctx) {
 #pragma clang diagnostic pop
 #endif
 
+int server_pause_read(server_handle_t server, connection_t* conn) {
+  if (!server || !conn || conn->fd < 0) return -1;
+  conn->processing = true;
+  struct kevent ev;
+  EV_SET(&ev, conn->fd, EVFILT_READ, EV_DELETE, 0, 0, conn);
+  kevent(server->ctx.kq, &ev, 1, NULL, 0, NULL);
+  return 0;
+}
+
+int server_resume_read(server_handle_t server, connection_t* conn) {
+  if (!server || !conn || conn->fd < 0) return -1;
+  conn->processing = false;
+  struct kevent ev;
+  EV_SET(&ev, conn->fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, conn);
+  kevent(server->ctx.kq, &ev, 1, NULL, 0, NULL);
+  return 0;
+}
+
 static void handle_client_read(kevent_context_t* ctx, int fd,
                                connection_t* conn) {
+  if (conn->processing) return;
   (void)fd;
-
-  /* Ensure buffer has space */
-  if (conn->buffer_len >= conn->buffer_cap) {
+  ...
+      /* Ensure buffer has space */
+      if (conn->buffer_len >= conn->buffer_cap) {
     /* Need to grow buffer */
     size_t new_cap = conn->buffer_cap * 2;
     if (new_cap > ctx->config.max_body_size && ctx->config.max_body_size > 0) {

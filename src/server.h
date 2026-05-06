@@ -155,6 +155,12 @@ typedef struct {
   /** Platform-specific SQE data to avoid heap allocations in hot path */
   void* platform_sqe_data_recv;
   void* platform_sqe_data_send;
+
+  /** Hardening: True if JS layer is currently processing this connection */
+  bool processing;
+
+  /** Hardening: Last activity timestamp (seconds) for idle timeout */
+  uint64_t last_active;
 } connection_t;
 
 /**
@@ -338,6 +344,18 @@ int server_send_response(server_handle_t server, connection_t* conn,
  */
 int server_write(server_handle_t server, connection_t* conn, const void* data,
                  size_t len);
+
+/**
+ * Pause read events for a connection.
+ * Used when JS layer is processing a request on a persistent connection.
+ */
+int server_pause_read(server_handle_t server, connection_t* conn);
+
+/**
+ * Resume read events for a connection.
+ * Used when JS layer has finished processing.
+ */
+int server_resume_read(server_handle_t server, connection_t* conn);
 
 /**
  * Get connection by file descriptor.

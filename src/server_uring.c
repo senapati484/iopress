@@ -568,14 +568,28 @@ static void handle_send_completion(uring_context_t* ctx, connection_t* conn,
   }
 }
 
+int server_pause_read(server_handle_t server, connection_t* conn) {
+  if (!server || !conn || conn->fd < 0) return -1;
+  conn->processing = true;
+  return 0;
+}
+
+int server_resume_read(server_handle_t server, connection_t* conn) {
+  if (!server || !conn || conn->fd < 0) return -1;
+  conn->processing = false;
+  /* Re-arm RECV immediately when resuming */
+  arm_recv(&server->ctx, conn);
+  return 0;
+}
+
 static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
                                    int bytes_read) {
+  if (conn->processing) return;
   if (bytes_read <= 0) {
     close_connection(ctx, conn->fd);
     return;
   }
-
-  conn->buffer_len += bytes_read;
+  ... conn->buffer_len += bytes_read;
 
   parse_result_t result;
   int status = http_parse_request(conn->buffer, conn->buffer_len, &result);

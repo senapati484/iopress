@@ -300,6 +300,9 @@ static int on_request_c_handler(connection_t* conn,
   /* Store connection in request data to avoid race condition */
   req_data->conn = conn;
 
+  /* Pause reads for this connection until JS layer calls res.send() */
+  server_pause_read(g_context.server, conn);
+
   /* Call thread-safe function (non-blocking) */
   napi_call_threadsafe_function(g_context.tsfn, req_data,
                                 napi_tsfn_nonblocking);
@@ -479,6 +482,8 @@ napi_value res_send_wrapper(napi_env env, napi_callback_info info) {
   /* Send using connection from response object (no race condition) */
   if (g_context.server && conn) {
     server_send_response(g_context.server, conn, &resp);
+    /* Resume reads now that response is sent */
+    server_resume_read(g_context.server, conn);
   }
 
   free(body_str);
