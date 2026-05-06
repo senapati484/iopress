@@ -357,21 +357,26 @@ static void close_connection(iocp_context_t* ctx, SOCKET fd) {
     conn->out_buffer_len = 0;
     conn->out_buffer_pos = 0;
 
+    /* Free output buffer */
+    if (conn->out_buffer) {
+      free(conn->out_buffer);
+      conn->out_buffer = NULL;
+    }
+    conn->out_buffer_cap = 0;
+    conn->out_buffer_len = 0;
+    conn->out_buffer_pos = 0;
+
     /* Cleanup platform_sqe_data */
     if (conn->platform_sqe_data_recv) {
       free(conn->platform_sqe_data_recv);
       conn->platform_sqe_data_recv = NULL;
     }
     if (conn->platform_sqe_data_send) {
-      /* SEND objects are usually dynamically allocated per write in IOCP
-       * because multiple sends can be outstanding. We cleanup any
-       * remaining one if it was somehow cached. */
       free(conn->platform_sqe_data_send);
       conn->platform_sqe_data_send = NULL;
     }
   }
 }
-
 /* ============================================================================
  * Worker Thread
  * ============================================================================
@@ -703,30 +708,45 @@ int server_write(server_handle_t server, connection_t* conn, const void* data,
                  size_t len) {
   if (conn == NULL || data == NULL || len == 0) return -1;
 
-  iocp_overlapped_t* ov = malloc(sizeof(iocp_overlapped_t));
-  if (!ov) return -1;
-
-  memset(ov, 0, sizeof(iocp_overlapped_t));
-  ov->type = OP_SEND;
-  ov->conn = conn;
-
-  size_t to_send = len > BUFFER_SIZE ? BUFFER_SIZE : len;
-  memcpy(ov->buffer, data, to_send);
-  ov->wsabuf.buf = ov->buffer;
-  ov->wsabuf.len = (ULONG)to_send;
-
-  DWORD sent = 0;
-  if (WSASend((SOCKET)conn->fd, &ov->wsabuf, 1, &sent, 0, &ov->overlapped,
-              NULL) == SOCKET_ERROR) {
-    if (WSAGetLastError() != WSA_IO_PENDING) {
-      free(ov);
-      return -1;
-    }
+  /* 1. Append to output buffer */
+  if (conn->out_buffer_len + len > conn->out_buffer_cap) {
+    size_t new_cap =
+        conn->out_buffer_cap == 0 ? 16384 : conn->out_buffer_cap * 2;
+    while (new_cap < conn->out_buffer_len + len) new_cap *= 2;
+    uint8_t* new_buf = realloc(conn->out_buffer, new_cap);
+    if (!new_buf) return -1;
+    conn->out_buffer = new_buf;
+    conn->out_buffer_cap = new_cap;
   }
 
-  /* If there's more data, we should handle it.
-   * For now, this implementation is simplified.
-   * In a real high-perf scenario, we'd queue the remainder. */
+  memcpy(conn->out_buffer + conn->out_buffer_len, data, len);
+  conn->out_buffer_len += len;
+
+  /* 2. Arm send if this is the only data */
+  if (conn->out_buffer_len == len) {
+    iocp_overlapped_t* ov = malloc(sizeof(iocp_overlapped_t));
+    if (!ov) return -1;
+
+    memset(ov, 0, sizeof(iocp_overlapped_t));
+    ov->type = OP_SEND;
+    ov->conn = conn;
+
+    size_t to_send = (conn->out_buffer_len - conn->out_buffer_pos) > BUFFER_SIZE
+                         ? BUFFER_SIZE
+                         : (conn->out_buffer_len - conn->out_buffer_pos);
+    memcpy(ov->buffer, conn->out_buffer + conn->out_buffer_pos, to_send);
+    ov->wsabuf.buf = ov->buffer;
+    ov->wsabuf.len = (ULONG)to_send;
+
+    DWORD sent = 0;
+    if (WSASend((SOCKET)conn->fd, &ov->wsabuf, 1, &sent, 0, &ov->overlapped,
+                NULL) == SOCKET_ERROR) {
+      if (WSAGetLastError() != WSA_IO_PENDING) {
+        free(ov);
+        return -1;
+      }
+    }
+  }
 
   return 0;
 }
