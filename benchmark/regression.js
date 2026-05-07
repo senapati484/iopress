@@ -128,14 +128,14 @@ async function runAutocannon(port, duration) {
     const autocannon = require('autocannon');
 
     const result = await autocannon({
-      url: `http://localhost:${port}/health`,
+      url: `http://localhost:${port}/`,
       duration: duration,
-      connections: 100,
-      pipelining: 1,
-      warmup: [{
-        connections: 10,
-        duration: 2
-      }]
+      connections: 500,
+      pipelining: 10,
+      warmup: {
+        connections: 100,
+        duration: 1
+      }
     });
 
     return result;
@@ -192,7 +192,7 @@ async function main() {
 
   const threshold = getThreshold();
   const port = 9999;
-  const duration = isCI ? 5 : 3; // 5 seconds in CI, 3 locally
+  const duration = isCI ? 5 : 5; // 5 seconds in CI and locally to match original test
 
   // Create app and start server
   log('Starting server...', 'blue');

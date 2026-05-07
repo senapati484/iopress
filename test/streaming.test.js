@@ -12,7 +12,7 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 const iopress = require('../js/index.js');
 
-const TEST_PORT = 3461;
+const TEST_PORT = 3464;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
 describe('Streaming Body Tests', () => {

@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-04-05T18:02:19.463Z",
+  "timestamp": "2026-05-06T05:35:11.677Z",
   "systemInfo": {
     "platform": "darwin",
     "arch": "arm64",
     "cpus": 8,
     "cpuModel": "Apple M2",
     "totalMemory": 8192,
-    "freeMemory": 82,
+    "freeMemory": 91,
     "nodeVersion": "v20.18.0",
     "v8Version": "11.3.244.8-node.23",
-    "uptime": 534877
+    "uptime": 435842
   },
   "platform": "darwin",
   "target": {
@@ -23,32 +23,32 @@
       "hello-world": {
         "scenario": "hello-world",
         "stats": {
-          "rps": 224822,
+          "rps": 144362,
           "meanLatency": 0,
           "p50": 0,
           "p95": 0,
           "p99": 0,
           "maxLatency": 0,
-          "totalRequests": 1124110,
+          "totalRequests": 721810,
           "totalErrors": 0,
           "throughput": "0"
         },
-        "timestamp": "2026-04-05T18:02:14.382Z"
+        "timestamp": "2026-05-06T05:35:06.546Z"
       },
       "health-check": {
         "scenario": "health-check",
         "stats": {
-          "rps": 209080,
+          "rps": 145004,
           "meanLatency": 0,
           "p50": 0,
           "p95": 0,
           "p99": 0,
           "maxLatency": 0,
-          "totalRequests": 1045400,
+          "totalRequests": 725020,
           "totalErrors": 0,
           "throughput": "0"
         },
-        "timestamp": "2026-04-05T18:02:19.462Z"
+        "timestamp": "2026-05-06T05:35:11.676Z"
       }
     },
     "express": {}
