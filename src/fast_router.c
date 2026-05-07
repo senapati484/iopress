@@ -139,8 +139,9 @@ int fast_router_register(const char* method, const char* path,
       numbuf[numlen++] = '0' + (rlen % 10);
       rlen /= 10;
     }
-    while (numlen > 0) *p++ = numbuf[--numlen];
   }
+  /* Write digits (reversed) - handles both rlen==0 and rlen>0 */
+  while (numlen > 0) *p++ = numbuf[--numlen];
   *p++ = '\r';
   *p++ = '\n';
 
@@ -271,24 +272,11 @@ const char* fast_router_get_file_path(const char* method, size_t method_len,
   return NULL;
 }
 
-/* Pre-register common routes for zero-JS fast path */
+/* Pre-register common routes for zero-JS fast path.
+ * NOTE: No default routes are registered here to avoid silently overriding
+ * user-defined handlers. Routes are added selectively from js/index.js
+ * listen() for paths NOT claimed by the user application. */
 void fast_router_register_defaults(void) {
   fast_router_init();
-
-  /* Core routes */
-  fast_router_register("GET", "/health", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"status\":\"ok\"}", 15);
-  fast_router_register("GET", "/ping", ROUTE_TYPE_STATIC_TEXT, 200,
-                       "text/plain", (uint8_t*)"pong", 4);
-  fast_router_register("GET", "/", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"message\":\"ok\"}",
-                       15);
-
-  /* Benchmark routes */
-  fast_router_register("GET", "/users", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"users\":[]}", 13);
-  fast_router_register("POST", "/echo", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"test\":\"data\"}", 16);
-  fast_router_register("GET", "/search", ROUTE_TYPE_STATIC_JSON, 200,
-                       "application/json", (uint8_t*)"{\"results\":[]}", 15);
+  /* Routes registered dynamically by RegisterFastRoute from JS */
 }

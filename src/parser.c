@@ -8,6 +8,8 @@
  * @version 1.0.0
  */
 
+#include "parser.h"
+
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>

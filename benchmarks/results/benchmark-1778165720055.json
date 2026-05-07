@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-05-07T14:55:20.055Z",
+  "systemInfo": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 8,
+    "cpuModel": "Apple M2",
+    "totalMemory": 8192,
+    "freeMemory": 143,
+    "nodeVersion": "v20.18.0",
+    "v8Version": "11.3.244.8-node.23",
+    "uptime": 555851
+  },
+  "platform": "darwin",
+  "target": {
+    "backend": "kqueue",
+    "minRps": 150000,
+    "targetRps": 215000,
+    "maxLatencyP99": 10
+  },
+  "results": {
+    "iopress": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 220958,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 1104790,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-05-07T14:55:03.640Z"
+      },
+      "health-check": {
+        "scenario": "health-check",
+        "stats": {
+          "rps": 208280,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 1041400,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-05-07T14:55:08.758Z"
+      }
+    },
+    "express": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 17298,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 86490,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-05-07T14:55:14.933Z"
+      },
+      "health-check": {
+        "scenario": "health-check",
+        "stats": {
+          "rps": 16722.4,
+          "meanLatency": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "maxLatency": 0,
+          "totalRequests": 83612,
+          "totalErrors": 0,
+          "throughput": "0"
+        },
+        "timestamp": "2026-05-07T14:55:20.053Z"
+      }
+    }
+  }
+}

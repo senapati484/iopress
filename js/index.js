@@ -80,16 +80,29 @@ if (process.env.IOPRESS_WORKER === '1') {
 function parseQuery(query) {
   const result = {};
   if (!query) return result;
-
-  const params = new URLSearchParams(query);
-  for (const [key, value] of params) {
-    if (result[key] === undefined) {
-      result[key] = value;
-    } else if (Array.isArray(result[key])) {
-      result[key].push(value);
-    } else {
-      result[key] = [result[key], value];
+  let i = 0;
+  while (i < query.length) {
+    let eq = query.indexOf('=', i);
+    let amp = query.indexOf('&', i);
+    if (amp === -1) amp = query.length;
+    if (eq === -1 || eq > amp) {
+      if (i < amp) {
+        const key = decodeURIComponent(query.slice(i, amp));
+        result[key] = result[key] ? [].concat(result[key], '') : '';
+      }
+      i = amp + 1; 
+      continue; 
     }
+    const key = decodeURIComponent(query.slice(i, eq));
+    const val = decodeURIComponent(query.slice(eq + 1, amp));
+    if (result[key] === undefined) {
+      result[key] = val;
+    } else if (Array.isArray(result[key])) {
+      result[key].push(val);
+    } else {
+      result[key] = [result[key], val];
+    }
+    i = amp + 1;
   }
   return result;
 }
@@ -671,6 +684,39 @@ class iopress {
   }
 
   /**
+   * Register middleware.
+   *
+   * @param {string|Function} pathOrHandler - Path or middleware function
+   * @param {...Function} handlers - Middleware functions
+   * @returns {iopress} Returns this for chaining
+   */
+  use(pathOrHandler, ...handlers) {
+    let path = '/';
+    let fns = [];
+
+    if (typeof pathOrHandler === 'string') {
+      path = pathOrHandler;
+      fns = handlers;
+    } else if (typeof pathOrHandler === 'function') {
+      fns = [pathOrHandler, ...handlers];
+    }
+
+    for (const fn of fns) {
+      if (typeof fn !== 'function') {
+        throw new TypeError('Middleware must be a function');
+      }
+      const isErrorHandler = fn.length === 4;
+      this.middleware.push({ 
+        path, 
+        handler: fn, 
+        isTerminal: false,
+        isErrorHandler 
+      });
+    }
+    return this;
+  }
+
+  /**
    * Helper to add a route with validation.
    *
    * @param {string} method - HTTP method
@@ -781,29 +827,34 @@ class iopress {
     const handler = handlers[index];
 
     // Create next function
-    const next = async (err) => {
+    const next = (err) => {
       if (err) {
         if (this.errorHandler) {
           try {
-            await this.errorHandler(err, req, res);
-          } catch {
-            res.status(500).send('Internal Server Error');
+            const result = this.errorHandler(err, req, res);
+            if (result && typeof result.then === 'function') {
+              result.catch(e => {
+                if (!res._sent) res.status(500).send('Internal Server Error');
+              });
+            }
+          } catch (e) {
+            if (!res._sent) res.status(500).send('Internal Server Error');
           }
         } else {
-          res.status(500).send('Internal Server Error');
+          if (!res._sent) res.status(500).send('Internal Server Error');
         }
         return;
       }
 
       // Continue to next handler
-      await this._executeChain(req, res, handlers, index + 1);
+      this._executeChain(req, res, handlers, index + 1);
     };
 
     try {
       const result = handler(req, res, next);
       if (result && typeof result.then === 'function') {
-        // Async handler - wait for it
-        await result;
+        // Async handler - catch errors but do not await to avoid microtask queue overhead on success path
+        result.catch(next);
       }
     } catch (err) {
       next(err);
@@ -882,12 +933,16 @@ class iopress {
       if (match) {
         req.params = match.params;
 
-        const chain = [
-          ...self.middleware.filter(m => {
-            return req.path.startsWith(m.path) && !m.isTerminal;
-          }).map(m => m.handler),
-          ...match.route.handlers
-        ];
+        const chain = [];
+        for (let i = 0; i < self.middleware.length; i++) {
+          const m = self.middleware[i];
+          if (req.path.startsWith(m.path) && !m.isTerminal) {
+            chain.push(m.handler);
+          }
+        }
+        for (let i = 0; i < match.route.handlers.length; i++) {
+          chain.push(match.route.handlers[i]);
+        }
 
         self._executeChain(req, res, chain);
       } else {
@@ -897,12 +952,29 @@ class iopress {
 
     if (native.RegisterFastRoute) {
       try {
-        native.RegisterFastRoute('GET', '/health', 200, '{"status":"ok"}');
-        native.RegisterFastRoute('GET', '/', 200, '{"message":"ok"}');
-        native.RegisterFastRoute('GET', '/ping', 200, 'pong');
-        native.RegisterFastRoute('GET', '/users', 200, '{"users":[]}');
-        native.RegisterFastRoute('POST', '/echo', 200, '{"test":"data"}');
-        native.RegisterFastRoute('GET', '/search', 200, '{"results":[]}');
+        /* Build a set of method|path keys that the user has defined handlers
+         * for. We must NOT register fast-path static responses for those paths
+         * because doing so would bypass the user's handler entirely. */
+        const userRouteKeys = new Set(
+          self.routes.map(r => r.method.toUpperCase() + '|' + r.path)
+        );
+
+        /* Default static fast-path routes. Only registered when the user has
+         * not defined their own handler for that method + path. */
+        const defaultFastRoutes = [
+          ['GET',  '/health', 200, '{"status":"ok"}'],
+          ['GET',  '/',       200, '{"message":"ok"}'],
+          ['GET',  '/ping',   200, 'pong'],
+          ['GET',  '/users',  200, '{"users":[]}'],
+          ['POST', '/echo',   200, '{"test":"data"}'],
+          ['GET',  '/search', 200, '{"results":[]}'],
+        ];
+
+        for (const [method, path, status, body] of defaultFastRoutes) {
+          if (!userRouteKeys.has(method + '|' + path)) {
+            native.RegisterFastRoute(method, path, status, body);
+          }
+        }
       } catch (e) {
         console.error('RegisterFastRoute error:', e.message);
       }

@@ -90,6 +90,9 @@ static int cache_initialized = 0;
 static int cache_hits = 0;
 static int cache_misses = 0;
 
+/* Forward declaration for status text */
+static const char* get_status_text(int status);
+
 static void init_route_cache(void) {
   if (cache_initialized) return;
 
@@ -577,6 +580,12 @@ napi_value Listen(napi_env env, napi_callback_info info) {
   napi_value args[3];
   napi_get_cb_info(env, info, &argc, args, NULL, NULL);
 
+  /* Reset the fast router so routes from a previous server instance (e.g.
+   * integration tests running in the same process before a benchmark) do not
+   * bleed into this new server.  RegisterFastRoute calls after this point will
+   * repopulate the table with only the routes the caller intends. */
+  fast_router_init();
+
   /* Get port */
   int32_t port = 3000;
   if (argc > 0) {
@@ -737,14 +746,17 @@ napi_value SendResponse(napi_env env, napi_callback_info info) {
       int conn_fd = conn->fd;
 
       char response[32768];
-      int len = snprintf(
-          response, sizeof(response),
-          "HTTP/1.1 %d %s\r\n"
-          "%s" /* Custom headers */
-          "Content-Length: %zu\r\n"
-          "\r\n",
-          status, status < 400 ? "OK" : (status < 500 ? "Not Found" : "Error"),
-          headers_len > 0 ? headers_buf : "", body_len);
+      int len = snprintf(response, sizeof(response),
+                         "HTTP/1.1 %d %s\r\n"
+                         "%s" /* Custom headers */
+                         "Content-Length: %zu\r\n"
+                         "\r\n",
+                         status, get_status_text(status),
+                         headers_len > 0 ? headers_buf : "", body_len);
+
+      /* Mark headers as sent so handle_client_write can reset the
+       * connection correctly if the write was queued (partial). */
+      conn->headers_sent = true;
 
       /* Send headers */
       server_write(g_context.server, conn, response, len);
@@ -759,22 +771,27 @@ napi_value SendResponse(napi_env env, napi_callback_info info) {
         close(conn_fd);
         conn->fd = -1;
       } else {
-        /* Reset state if all data sent immediately, otherwise
-         * handle_client_write will do it */
+        /* If the write completed immediately (nothing in out_buffer), reset
+         * connection state right now. Otherwise handle_client_write will
+         * call reset_connection once the queued data is flushed. */
         if (conn->out_buffer_len == 0) {
-          /* Reset buffer and state for next request on keep-alive connection */
           conn->buffer_len = 0;
           conn->buffer_pos = 0;
           conn->request_complete = false;
           conn->headers_sent = false;
 
-          /* Free assembled body if any */
           if (conn->assembled_body) {
             free(conn->assembled_body);
             conn->assembled_body = NULL;
             conn->assembled_body_len = 0;
           }
         }
+
+        /* Re-enable reads for the next request on this keep-alive connection.
+         * server_pause_read was called in on_request_c_handler; without this
+         * the kqueue EVFILT_READ filter stays deleted and the connection hangs
+         * forever on the client side. */
+        server_resume_read(g_context.server, conn);
       }
     }
   }
@@ -825,7 +842,69 @@ napi_value Close(napi_env env, napi_callback_info info) {
 }
 
 /* ============================================================================
- * Module Initialization
+ * HTTP Status Code Mapping
+ * ============================================================================
+ */
+
+static const char* get_status_text(int status) {
+  switch (status) {
+    case 100:
+      return "Continue";
+    case 101:
+      return "Switching Protocols";
+    case 200:
+      return "OK";
+    case 201:
+      return "Created";
+    case 202:
+      return "Accepted";
+    case 204:
+      return "No Content";
+    case 206:
+      return "Partial Content";
+    case 301:
+      return "Moved Permanently";
+    case 302:
+      return "Found";
+    case 304:
+      return "Not Modified";
+    case 400:
+      return "Bad Request";
+    case 401:
+      return "Unauthorized";
+    case 403:
+      return "Forbidden";
+    case 404:
+      return "Not Found";
+    case 405:
+      return "Method Not Allowed";
+    case 408:
+      return "Request Timeout";
+    case 409:
+      return "Conflict";
+    case 413:
+      return "Payload Too Large";
+    case 415:
+      return "Unsupported Media Type";
+    case 429:
+      return "Too Many Requests";
+    case 500:
+      return "Internal Server Error";
+    case 501:
+      return "Not Implemented";
+    case 502:
+      return "Bad Gateway";
+    case 503:
+      return "Service Unavailable";
+    case 504:
+      return "Gateway Timeout";
+    default:
+      return "Unknown";
+  }
+}
+
+/* ============================================================================
+ * SendResponse Implementation
  * ============================================================================
  */
 

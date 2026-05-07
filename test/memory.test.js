@@ -13,7 +13,7 @@ const assert = require('node:assert');
 const http = require('http');
 const iopress = require('../js/index.js');
 
-const TEST_PORT = 3462;
+const TEST_PORT = 3463;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
 // Helper to make HTTP requests

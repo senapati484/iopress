@@ -9,6 +9,31 @@
 
 #include "server.h"
 
+/* Parsing status codes */
+#define PARSE_STATUS_DONE 0
+#define PARSE_STATUS_NEED_MORE 1
+#define PARSE_STATUS_ERROR 2
+
+#define MAX_HEADER_SIZE 32768
+
+typedef struct parse_result_s {
+  int status;
+  int error_code;
+  const char* method;
+  size_t method_len;
+  const char* path;
+  size_t path_len;
+  const char* query;
+  size_t query_len;
+  uint8_t http_major;
+  uint8_t http_minor;
+  bool headers_complete;
+  size_t body_start;
+  bool body_present;
+  size_t body_length;
+  size_t bytes_consumed;
+} parse_result_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

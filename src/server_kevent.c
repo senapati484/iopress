@@ -367,7 +367,7 @@ static const uint8_t RESPONSE_200_ECHO[] =
 
 static const uint8_t RESPONSE_200_SEARCH[] =
     "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 15\r\n"
+    "Content-Length: 14\r\n"
     "Connection: keep-alive\r\n"
     "Content-Type: application/json\r\n"
     "\r\n"
@@ -809,10 +809,9 @@ int server_resume_read(server_handle_t server, connection_t* conn) {
 static void handle_client_read(kevent_context_t* ctx, int fd,
                                connection_t* conn) {
   if (conn->processing) return;
-  (void)fd;
-  ...
-      /* Ensure buffer has space */
-      if (conn->buffer_len >= conn->buffer_cap) {
+
+  /* Ensure buffer has space */
+  if (conn->buffer_len >= conn->buffer_cap) {
     /* Need to grow buffer */
     size_t new_cap = conn->buffer_cap * 2;
     if (new_cap > ctx->config.max_body_size && ctx->config.max_body_size > 0) {
@@ -922,8 +921,8 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
       size_t fast_response_len = 0;
 
       int fast_handled = fast_router_try_handle_full(
-          result.method, strlen(result.method), result.path,
-          strlen(result.path), &fast_response, &fast_response_len);
+          result.method, result.method_len, result.path, result.path_len,
+          &fast_response, &fast_response_len);
 
       if (fast_handled == 0 && fast_response != NULL && fast_response_len > 0) {
         /* Ultra fast path - write pre-built response directly */
