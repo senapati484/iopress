@@ -22,7 +22,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #include "fast_router.h"
 #include "parser.h"
@@ -589,7 +591,7 @@ static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
     close_connection(ctx, conn->fd);
     return;
   }
-  ... conn->buffer_len += bytes_read;
+  conn->buffer_len += bytes_read;
 
   parse_result_t result;
   int status = http_parse_request(conn->buffer, conn->buffer_len, &result);
