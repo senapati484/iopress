@@ -1,78 +1,50 @@
-# iopress Documentation
+# @iopress/core Documentation
 
-Welcome to the iopress documentation! Choose your path:
-
-## Quick Start
-
-- [**Getting Started**](guides/getting-started.md) - Your first iopress server in 5 minutes
-- [**Installation**](deployment/PREBUILT_BINARIES.md) - Installation options and prebuilt binaries
-
-## Core Documentation
-
-### API Reference
-
-- TypeScript definitions in `../index.d.ts`
-- JSDoc comments in source code
-
-### Guides
-
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](guides/getting-started.md) | First server setup |
-| [Contributing](../CONTRIBUTING.md) | How to contribute |
-| [Security](../SECURITY.md) | Security policies |
-
-## Deployment
-
-| Topic | Description |
-|-------|-------------|
-| [Prebuilt Binaries](deployment/PREBUILT_BINARIES.md) | Installation without build tools |
-| [Load Balancer Replacement](deployment/LOAD_BALANCER_GUIDE.md) | When you don't need a load balancer |
-
-## Performance
-
-| Topic | Description |
-|-------|-------------|
-| [Performance Analysis](performance/PERFORMANCE.md) | Benchmarks and optimization |
-| [Fast Router](../src/fast_router.c) | C-level routing for maximum speed |
-
-## Development
-
-| Topic | Description |
-|-------|-------------|
-| [Roadmap](../ROADMAP.md) | Future features and v2 plans |
-| [Changelog](../CHANGELOG.md) | Version history |
-| [Development Roadmap](development-roadmap.md) | Implementation priorities |
-
-## Key Features
-
-- ⚡ **High Performance**: 300k+ req/s on Linux with io_uring
-- 🚀 **Native Speed**: Written in C with platform-specific optimizations
-- 📦 **Express Compatible**: Drop-in replacement for Express.js
-- 🔧 **Prebuilt Binaries**: No build tools required
-- 💪 **Load Balancer Optional**: Single process handles massive traffic
-
-## Platform Support
-
-| Platform | Status | Performance |
-|----------|--------|-------------|
-| Linux (io_uring) | ✅ Full | 300k-500k req/s |
-| macOS (kqueue) | ✅ Full | 80k+ req/s |
-| Windows (IOCP) | ✅ Full | 100k+ req/s |
-
-## Quick Links
-
-- [GitHub Repository](https://github.com/senapati484/iopress)
-- [npm Package](https://www.npmjs.com/package/@iopress/core)
-- [Issues & Bug Reports](https://github.com/senapati484/iopress/issues)
-- [Discussions](https://github.com/senapati484/iopress/discussions)
-
-## Community
-
-- 💬 [Discord](https://discord.gg/iopress)
-- 🐦 [Twitter](https://twitter.com/iopress)
-- 📧 [Email Support](mailto:support@iopress.dev)
+Welcome to the official documentation for **@iopress/core**. This site is organized into four quadrants, based on the **Diátaxis** framework, to help you find the information you need quickly.
 
 ---
 
-**License:** ISC | **Author:** senapati484
+## 🎓 Tutorials
+*Learning-oriented: Lessons that take you by the hand to achieve a specific goal.*
+
+- [**Getting Started**](tutorials/getting-started.md) - Your first iopress server in 5 minutes.
+- [**Building a REST API**](tutorials/getting-started.md#complete-example-rest-api) - A step-by-step example of a CRUD service.
+
+---
+
+## 🛠️ How-to Guides
+*Problem-oriented: Recipes to solve specific problems or migrate existing workflows.*
+
+- [**Migration from Express.js**](how-to/migration-guide.md) - A detailed guide for Express users.
+- [**Installation & Prerequisites**](how-to/installation.md) - Setting up native dependencies on Linux, macOS, and Windows.
+- [**Load Balancer Optimization**](how-to/load-balancer.md) - How to run @iopress/core at scale without a proxy.
+
+---
+
+## 📚 Reference
+*Information-oriented: Technical descriptions and specifications.*
+
+- [**API Reference**](reference/api/index.md) - Complete documentation for `app`, `req`, and `res`.
+- [**Compatibility Matrix**](reference/compatibility.md) - Detailed comparison with Express.js APIs.
+- [**Test & Benchmark Results**](reference/test-results.md) - Latest performance data from our CI/CD.
+
+---
+
+## 🧠 Explanation
+*Understanding-oriented: Clarifying and illuminating topics, providing deep context.*
+
+- [**Architecture Overview**](explanation/architecture.md) - Understanding the native async I/O layer.
+- [**Performance Mechanics**](explanation/performance.md) - Why @iopress/core is up to 30x faster than traditional frameworks.
+- [**Native Binding Contract**](explanation/binding-contract.md) - Technical details of the N-API implementation.
+
+---
+
+## 🤝 Community & Development
+- [**Contributing Guide**](../CONTRIBUTING.md) - How to contribute to the core or docs.
+- [**Security Policy**](../SECURITY.md) - Reporting vulnerabilities.
+- [**Project Roadmap**](community/roadmap.md) - What's coming in v2.
+- [**Changelog**](community/changelog.md) - Version history.
+
+---
+
+**Back to [Main README](../README.md)**
