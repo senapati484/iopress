@@ -1,3 +1,5 @@
+[![Iopress Logo](/docs/img/logo.png)](https://iopress.vercel.app/)
+
 # @iopress/core
 
 High-performance native HTTP server for Node.js with platform-specific async I/O. Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows) for maximum throughput with minimal latency.
@@ -37,6 +39,7 @@ High-performance native HTTP server for Node.js with platform-specific async I/O
 ╠══════════════════════════════════════════════════════════════════╣
 ║  ✓ PASSED - Target: 150,000 req/s | Achieved: 218,572 req/s      ║
 ╚══════════════════════════════════════════════════════════════════╝
+
 ```
 
 ### Linux (io_uring) - ⏳ PENDING TEST
