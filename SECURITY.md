@@ -16,13 +16,13 @@
 | Severity | Response Time | Method                                                                 |
 |----------|---------------|------------------------------------------------------------------------|
 | Critical | 24 hours      | GitHub Security Advisory: [Report a vulnerability](../../security/advisories/new) |
-| High     | 48 hours      | Email: security@iopress.dev (or GitHub Security tab)                |
+| High     | 48 hours      | Email: **sayansenapati2544@gmail.com** (or GitHub Security tab)         |
 | Moderate | 72 hours      | GitHub Security Advisory                                               |
 | Low      | 1 week        | GitHub Security Advisory                                               |
 
 ### Disclosure Process
 
-1. **Report**: Submit via [GitHub Security Advisory](../../security/advisories/new) or email
+1. **Report**: Submit via [GitHub Security Advisory](../../security/advisories/new) or email to **sayansenapati2544@gmail.com**
 2. **Acknowledge**: Core team acknowledges receipt within SLA timeframe
 3. **Assess**: We assess severity and validate the vulnerability
 4. **Patch**: Develop and test a fix privately
@@ -147,7 +147,7 @@ We work with [MITRE](https://cve.mitre.org/) and [GitHub Security Advisories](ht
 ## Security Contacts
 
 - **Primary**: GitHub Security Advisory (preferred)
-- **Emergency**: security@iopress.dev
+- **Emergency**: sayansenapati2544@gmail.com
 - **PGP Key**: [Download public key](./security-pgp-key.asc) (fingerprint: TBD)
 
 ## History
