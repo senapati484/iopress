@@ -14,7 +14,7 @@ describe('iopress', () => {
 
   it('should export version', () => {
     assert.strictEqual(typeof iopress.version, 'string');
-    assert.strictEqual(iopress.version, '1.0.0');
+    assert.strictEqual(iopress.version, '1.0.3');
   });
 
   it('should have native functions', () => {

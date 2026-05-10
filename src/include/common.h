@@ -1,7 +1,7 @@
 #ifndef EXPRESS_PRO_COMMON_H_
 #define EXPRESS_PRO_COMMON_H_
 
-#define EXPRESS_PRO_VERSION "1.0.0"
+#define EXPRESS_PRO_VERSION "1.0.3"
 
 #if defined(EXPRESS_PRO_LINUX)
 #define EXPRESS_PRO_PLATFORM "linux"

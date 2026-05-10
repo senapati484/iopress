@@ -5,7 +5,7 @@
  * Handles thread-safe communication using napi_threadsafe_function.
  *
  * @file binding.c
- * @version 1.0.0
+ * @version 1.0.3
  */
 
 #include <node_api.h>
@@ -951,7 +951,7 @@ napi_value Init(napi_env env, napi_value exports) {
 
   /* Export version info */
   napi_value version;
-  napi_create_string_utf8(env, "1.0.0", NAPI_AUTO_LENGTH, &version);
+  napi_create_string_utf8(env, "1.0.3", NAPI_AUTO_LENGTH, &version);
   napi_set_named_property(env, exports, "version", version);
 
   napi_value platform;

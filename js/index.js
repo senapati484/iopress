@@ -5,7 +5,7 @@
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
  * @module iopress
- * @version 1.0.0
+ * @version 1.0.3
  * @license ISC
  * @author senapati484
  *
@@ -833,11 +833,11 @@ class iopress {
           try {
             const result = this.errorHandler(err, req, res);
             if (result && typeof result.then === 'function') {
-              result.catch(e => {
+              result.catch(_e => {
                 if (!res._sent) res.status(500).send('Internal Server Error');
               });
             }
-          } catch (e) {
+          } catch {
             if (!res._sent) res.status(500).send('Internal Server Error');
           }
         } else {
