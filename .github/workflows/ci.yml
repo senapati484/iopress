@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [20]
+        node-version: [22]
         include:
           - os: ubuntu-latest
             platform: linux

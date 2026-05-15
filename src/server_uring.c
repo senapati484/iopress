@@ -502,17 +502,42 @@ static void arm_send(uring_context_t* ctx, connection_t* conn) {
  * ============================================================================
  */
 
-static void handle_new_connection(uring_context_t* ctx) {
+static void handle_new_connection(uring_context_t* ctx, int res) {
   int accepted = 0;
+  int client_fd = res;
 
+  if (client_fd >= 0) {
+    if (set_nonblocking(client_fd) >= 0) {
+      set_socket_options(client_fd);
+      connection_t* conn =
+          get_connection(ctx->connections, ctx->max_connections, client_fd);
+      if (conn != NULL) {
+        if (ctx->on_connection) {
+          ctx->on_connection(conn, 0, ctx->user_data);
+        }
+        arm_recv(ctx, conn);
+      } else {
+        close(client_fd);
+      }
+    } else {
+      close(client_fd);
+    }
+    accepted++;
+  } else {
+    /* If accept failed (e.g. EAGAIN, abort, etc.), we just re-arm and return */
+    if (res != -EAGAIN && res != -EWOULDBLOCK && res != -EINTR) {
+      /* Handle serious error if needed, but usually we just keep going */
+    }
+  }
+
+  /* Drain backlog manually */
   while (accepted < MAX_ACCEPT_BATCH) {
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
 
-    int client_fd =
+    client_fd =
         accept(ctx->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
     if (client_fd < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK) break;
       break;
     }
 
