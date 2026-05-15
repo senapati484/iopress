@@ -687,7 +687,7 @@ static void* event_loop_thread(void* arg) {
     if (data) {
       switch (data->type) {
         case OP_ACCEPT:
-          handle_new_connection(ctx);
+          handle_new_connection(ctx, res);
           break;
         case OP_RECV:
           handle_recv_completion(ctx, (connection_t*)data->ptr, res);
