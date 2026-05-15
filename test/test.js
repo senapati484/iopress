@@ -12,9 +12,14 @@ describe('iopress', () => {
     assert.ok(['linux', 'mac', 'kqueue', 'windows', 'unknown'].includes(iopress.platform));
   });
 
-  it('should export version', () => {
+  it('should export version in semver format', () => {
     assert.strictEqual(typeof iopress.version, 'string');
-    assert.strictEqual(iopress.version, '1.0.3');
+    // Validate semver format (x.y.z) rather than a hardcoded string so this
+    // never breaks when the package version is bumped.
+    assert.ok(
+      /^\d+\.\d+\.\d+/.test(iopress.version),
+      `Expected semver format, got: ${iopress.version}`
+    );
   });
 
   it('should have native functions', () => {

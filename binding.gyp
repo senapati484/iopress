@@ -60,14 +60,19 @@
             "defines": [
               "USE_IOCP",
               "WIN32_LEAN_AND_MEAN",
-              "_WIN32_WINNT=0x0600"
+              "_WIN32_WINNT=0x0600",
+              "_WINSOCK_DEPRECATED_NO_WARNINGS",
+              "NOMINMAX",
+              "NOGDI",
+              "VC_EXTRA_LEAN"
             ],
             "msvs_settings": {
               "VCCLCompilerTool": {
                 "Optimization": 3,
                 "InlineFunctionExpansion": 2,
                 "EnableIntrinsicFunctions": "true",
-                "FavorSizeOrSpeed": 1
+                "FavorSizeOrSpeed": 1,
+                "DisableSpecificWarnings": ["4201", "4214", "4115", "4996"]
               }
             }
           }

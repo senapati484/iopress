@@ -12,21 +12,23 @@ concurrency:
 
 jobs:
   check-version:
+    name: check-version
     runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       current_version: ${{ steps.check.outputs.current_version }}
       latest_npm_version: ${{ steps.check.outputs.latest_npm_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3 liburing-dev
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Get current version from package.json
         id: package
@@ -40,68 +42,33 @@ jobs:
           LATEST=$(npm view @iopress/core version 2>/dev/null || echo "0.0.0")
           echo "latest_npm_version=$LATEST" >> $GITHUB_OUTPUT
 
-      - name: Compare versions
+      - name: Compare versions and report
         id: check
         run: |
           CURRENT="${{ steps.package.outputs.current_version }}"
           LATEST="${{ steps.npm.outputs.latest_npm_version }}"
-          
-          echo "current_version=$CURRENT"
-          echo "latest_npm_version=$LATEST"
-          
+
+          echo "current_version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "latest_npm_version=$LATEST" >> $GITHUB_OUTPUT
+
           if [ "$CURRENT" = "$LATEST" ]; then
             echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "No version change detected. Skipping release."
+            echo "### ✅ Version Check" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| **package.json** | \`$CURRENT\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **npm latest** | \`$LATEST\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Status** | 🔵 No version change — release not needed |" >> $GITHUB_STEP_SUMMARY
+            echo "No version change detected ($LATEST). Release not needed."
           else
             echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "Version change detected: $LATEST -> $CURRENT"
+            echo "### ✅ Version Check" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| **package.json** | \`$CURRENT\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **npm latest** | \`$LATEST\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Status** | 🟢 Version bumped — release available (\`$LATEST\` → \`$CURRENT\`) |" >> $GITHUB_STEP_SUMMARY
+            echo "Version bumped: $LATEST → $CURRENT. A release could be triggered."
           fi
-
-  publish:
-    needs: check-version
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3 liburing-dev
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build native addon
-        run: npm run build
-        continue-on-error: true
-
-      - name: Run tests
-        run: npm test
-        continue-on-error: true
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
-
-      - name: Create GitHub Release
-        if: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ needs.check-version.outputs.current_version }}"
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --generate-notes
