@@ -165,9 +165,17 @@ describe('Large Body Tests', () => {
 
           // Just ensure no crash
           assert.ok(response.status === 200 || response.status === 413 || response.status === 500);
+
+          // Drain response body so the underlying socket closes cleanly.
+          // Without this the kqueue backend on macOS receives a new request
+          // on an already-closing fd and triggers SIGABRT in the C layer.
+          await response.text();
         } catch (err) {
           // Connection issues are acceptable
         }
+
+        // Small breathing room between iterations for GC / kqueue cleanup.
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
 
       // If we get here without crash, memory is stable

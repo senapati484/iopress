@@ -24,7 +24,16 @@
 #define NOMINMAX
 #endif
 
-/* Suppress MSVC warnings from Windows SDK headers */
+/* WIN32_LEAN_AND_MEAN strips the FAR typedef from windows.h.
+ * mswsock.h uses FAR in function declarations, so define it here
+ * to prevent C2059 syntax errors on SDK 10.0.26100+. */
+#ifndef FAR
+#define FAR
+#endif
+
+/* Correct include order per Microsoft guidelines:
+ *   winsock2.h must precede windows.h to avoid redefinition conflicts.
+ *   mswsock.h depends on winsock2 types so it comes last. */
 #pragma warning(push)
 #pragma warning(disable : 4201 4214 4115 4996 4242 4244)
 #include <mswsock.h>
