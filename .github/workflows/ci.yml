@@ -48,6 +48,7 @@ jobs:
         # Windows native build may have environment-specific failures;
         # allow the job to continue so other steps report their status.
         continue-on-error: ${{ runner.os == 'Windows' }}
+        timeout-minutes: 5
         run: npm test
 
       - name: Run benchmark regression test

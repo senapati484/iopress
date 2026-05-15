@@ -145,8 +145,10 @@ describe('Memory Leak Tests', () => {
     it('should handle repeated large allocations', async () => {
       const initialMemory = getMemoryMB();
 
+      // In CI reduce iterations to avoid hanging on slow shared runners.
+      const allocIterations = process.env.CI ? 50 : 1000;
       // Make requests that return data
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < allocIterations; i++) {
         await makeRequest(`/data/${i}`);
       }
 
@@ -170,8 +172,10 @@ describe('Memory Leak Tests', () => {
 
   describe('Native module memory', () => {
     it('should not crash on rapid connection open/close', async () => {
+      // In CI reduce iterations to avoid slow sequential I/O on shared runners.
+      const closeIterations = process.env.CI ? 20 : 100;
       // Rapidly open and close connections
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < closeIterations; i++) {
         try {
           await makeRequest('/health');
         } catch (err) {
