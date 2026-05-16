@@ -26,13 +26,16 @@
 
 /* Correct include order per Microsoft guidelines:
  *   winsock2.h must precede windows.h to avoid redefinition conflicts.
- *   mswsock.h depends on winsock2 types so it comes last. */
+ *   mswsock.h depends on winsock2 types so it comes last.
+ * clang-format guards prevent the alphabetical sorter from reordering these. */
 #pragma warning(push)
 #pragma warning(disable : 4201 4214 4115 4996 4242 4244)
-#include <mswsock.h>
-#include <windows.h>
+// clang-format off
 #include <winsock2.h>
+#include <windows.h>
 #include <ws2tcpip.h>
+#include <mswsock.h>
+// clang-format on
 #pragma warning(pop)
 
 #include "fast_router.h"
