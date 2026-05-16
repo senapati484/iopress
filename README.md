@@ -18,6 +18,7 @@
   - [Security Issues](#security-issues)
   - [Running Tests](#running-tests)
 - [License](#license)
+- [Changelog](CHANGELOG.md)
 
 [![NPM Version](https://img.shields.io/npm/v/@iopress/core)](https://npmjs.org/package/@iopress/core)
 [![NPM Downloads](https://img.shields.io/npm/dm/@iopress/core)](https://npmcharts.com/compare/@iopress/core?minimal=true)
