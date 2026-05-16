@@ -130,6 +130,14 @@ npm install
 npm test
 ```
 
+## Troubleshooting
+
+Since iopress uses native bindings for extreme performance, it interacts directly with kernel-level I/O. If you encounter issues after code changes, a hard restart of the Node process is recommended:
+
+```bash
+pkill -f node
+```
+
 ## License
 
 ISC License
