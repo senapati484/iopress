@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-05-15T07:13:25.033Z",
+  "systemInfo": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 8,
+    "cpuModel": "Apple M2",
+    "totalMemory": 8192,
+    "freeMemory": 179,
+    "nodeVersion": "v20.18.0",
+    "v8Version": "11.3.244.8-node.23",
+    "uptime": 1219336
+  },
+  "platform": "darwin",
+  "target": {
+    "backend": "kqueue",
+    "minRps": 150000,
+    "targetRps": 215000,
+    "maxLatencyP99": 10
+  },
+  "results": {
+    "iopress": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 196804,
+          "meanLatency": 25.22,
+          "p50": 24,
+          "p95": 0,
+          "p99": 63,
+          "maxLatency": 218,
+          "totalRequests": 984020,
+          "totalErrors": 0,
+          "throughput": "20.83"
+        },
+        "timestamp": "2026-05-15T07:13:08.593Z"
+      },
+      "health-check": {
+        "scenario": "health-check",
+        "stats": {
+          "rps": 190522,
+          "meanLatency": 25.98,
+          "p50": 24,
+          "p95": 0,
+          "p99": 43,
+          "maxLatency": 143,
+          "totalRequests": 952610,
+          "totalErrors": 0,
+          "throughput": "19.99"
+        },
+        "timestamp": "2026-05-15T07:13:13.692Z"
+      }
+    },
+    "express": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 15664,
+          "meanLatency": 114.25,
+          "p50": 80,
+          "p95": 0,
+          "p99": 1778,
+          "maxLatency": 5136,
+          "totalRequests": 78320,
+          "totalErrors": 0,
+          "throughput": "3.88"
+        },
+        "timestamp": "2026-05-15T07:13:19.922Z"
+      },
+      "health-check": {
+        "scenario": "health-check",
+        "stats": {
+          "rps": 15277.2,
+          "meanLatency": 114.4,
+          "p50": 79,
+          "p95": 0,
+          "p99": 1829,
+          "maxLatency": 5071,
+          "totalRequests": 76386,
+          "totalErrors": 0,
+          "throughput": "3.96"
+        },
+        "timestamp": "2026-05-15T07:13:25.030Z"
+      }
+    }
+  }
+}

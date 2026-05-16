@@ -18,6 +18,7 @@
 
 const http = require('http');
 const https = require('https');
+const net = require('net');
 const autocannon = require('autocannon');
 const { URL } = require('url');
 const fs = require('fs');
@@ -115,18 +116,35 @@ class BenchmarkHarness {
     console.log(`${colors[color] || ''}${message}${colors.reset}`);
   }
 
-  async startiopressServer(port = 3000) {
+  async getAvailablePort() {
+    return new Promise((resolve, reject) => {
+      const server = net.createServer();
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const { port } = server.address();
+        server.close(() => resolve(port));
+      });
+    });
+  }
+
+  async startiopressServer(port, scenarios = []) {
+    port = port || await this.getAvailablePort();
     this.log('\n[1/4] Starting @iopress/core server...', 'blue');
+    const useDefaultFastRoutes = scenarios.length > 0 && scenarios.every(s =>
+      s.name === 'hello-world' || s.name === 'health-check'
+    );
     
     const serverCode = `
       const iopress = require('../index.js');
-      const app = iopress();
-      
-      app.get('/', (req, res) => res.json({ message: 'ok' }));
-      app.get('/health', (req, res) => res.json({ status: 'ok' }));
-      app.get('/users', (req, res) => res.json({ users: [] }));
-      app.post('/echo', (req, res) => res.json(req.body));
-      app.get('/search', (req, res) => res.json({ results: [] }));
+      const app = iopress({ enableDefaultRoutes: ${useDefaultFastRoutes} });
+
+      if (!${useDefaultFastRoutes}) {
+        app.get('/', (req, res) => res.json({ message: 'ok' }));
+        app.get('/health', (req, res) => res.json({ status: 'ok' }));
+        app.get('/users/:id', (req, res) => res.json({ id: req.params.id }));
+        app.post('/echo', (req, res) => res.json(req.body));
+        app.get('/search', (req, res) => res.json({ results: [] }));
+      }
       
       app.listen(${port}, () => console.log('iopress running on port ${port}'));
     `;
@@ -135,13 +153,23 @@ class BenchmarkHarness {
     fs.writeFileSync(tempFile, serverCode);
 
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const startupTimer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error('Server startup timeout'));
+        }
+      }, 10000);
+
       this.serverProcess = spawn('node', [tempFile], {
         cwd: path.join(__dirname, '..'),
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
       this.serverProcess.stdout.on('data', (data) => {
-        if (data.toString().includes('running on port')) {
+        if (!settled && data.toString().includes('running on port')) {
+          settled = true;
+          clearTimeout(startupTimer);
           setTimeout(() => resolve(port), 500);
         }
       });
@@ -150,11 +178,18 @@ class BenchmarkHarness {
         console.error('Server error:', data.toString());
       });
 
-      setTimeout(() => reject(new Error('Server startup timeout')), 10000);
+      this.serverProcess.once('exit', (code, signal) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(startupTimer);
+          reject(new Error(`Server exited before startup (code=${code}, signal=${signal})`));
+        }
+      });
     });
   }
 
-  async startExpressServer(port = 3001) {
+  async startExpressServer(port) {
+    port = port || await this.getAvailablePort();
     this.log('[2/4] Starting Express.js server for comparison...', 'blue');
     
     const express = require('express');
@@ -214,8 +249,8 @@ class BenchmarkHarness {
         resolve({
           requests: result.requests.total,
           errors: result.errors,
-          latencies: result.latencies,
-          bytes: result.throughput.bytes,
+          latencies: result.latency || result.latencies || {},
+          bytes: result.throughput.total || result.throughput.bytes || 0,
           startTime: Date.now() - duration * 1000,
           endTime: Date.now()
         });
@@ -281,14 +316,19 @@ class BenchmarkHarness {
     const results = { iopress: {}, express: {} };
     const target = this.getTarget();
 
-    // Always run iopress
-    const iopressPort = await this.startiopressServer();
-    await this.warmup(iopressPort);
+    const staticScenarios = this.options.scenario
+      ? this.config.scenarios.filter(s => s.name === this.options.scenario)
+      : this.config.scenarios.filter(s =>
+          s.name === 'hello-world' || s.name === 'health-check'
+        );
 
-    // Only benchmark static routes for fair comparison
-    const staticScenarios = this.config.scenarios.filter(s => 
-      s.name === 'hello-world' || s.name === 'health-check'
-    );
+    if (staticScenarios.length === 0) {
+      throw new Error(`Unknown benchmark scenario: ${this.options.scenario}`);
+    }
+
+    // Always run iopress
+    const iopressPort = await this.startiopressServer(undefined, staticScenarios);
+    await this.warmup(iopressPort);
     
     for (const scenario of staticScenarios) {
       results.iopress[scenario.name] = await this.runScenario(scenario, { port: iopressPort });

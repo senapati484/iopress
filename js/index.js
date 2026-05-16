@@ -5,7 +5,7 @@
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
  * @module iopress
- * @version 1.0.3
+ * @version 1.0.4
  * @license ISC
  * @author senapati484
  *
@@ -475,8 +475,11 @@ class iopress {
  *
  * app.get('/', (req, res) => res.json({ message: 'Hello, World!' }));
  * app.listen(3000);
+ *
+ * @param {Object} [options] - Application options
+ * @param {boolean} [options.enableDefaultRoutes=false] - Enable built-in demo routes (/health, /ping, /users, /echo, /search). Default is false for cleaner output.
  */
-  constructor() {
+  constructor(options = {}) {
     this.routes = [];
     this.middleware = [];
     this.errorHandler = null;
@@ -489,6 +492,7 @@ class iopress {
     this._router = this;
     this.cache = {};
     this.domain = null;
+    this._enableDefaultRoutes = options.enableDefaultRoutes || false;
   }
 
   /**
@@ -950,7 +954,7 @@ class iopress {
       }
     });
 
-    if (native.RegisterFastRoute) {
+    if (native.RegisterFastRoute && self._enableDefaultRoutes) {
       try {
         /* Build a set of method|path keys that the user has defined handlers
          * for. We must NOT register fast-path static responses for those paths
@@ -959,8 +963,9 @@ class iopress {
           self.routes.map(r => r.method.toUpperCase() + '|' + r.path)
         );
 
-        /* Default static fast-path routes. Only registered when the user has
-         * not defined their own handler for that method + path. */
+        /* Default static fast-path routes. Only registered when:
+         * 1. enableDefaultRoutes option is true
+         * 2. The user has not defined their own handler for that method + path */
         const defaultFastRoutes = [
           ['GET',  '/health', 200, '{"status":"ok"}'],
           ['GET',  '/',       200, '{"message":"ok"}'],
@@ -973,6 +978,12 @@ class iopress {
         for (const [method, path, status, body] of defaultFastRoutes) {
           if (!userRouteKeys.has(method + '|' + path)) {
             native.RegisterFastRoute(method, path, status, body);
+          } else {
+            /* If the user has defined their own handler, ensure the default 
+             * fast-path route is NOT active in the native layer. */
+            if (native.UnregisterFastRoute) {
+              native.UnregisterFastRoute(method, path);
+            }
           }
         }
       } catch (e) {
@@ -1089,9 +1100,13 @@ class iopress {
  * });
  *
  * app.listen(3000);
+ *
+ * @example
+ * // Enable default routes
+ * const app = iopress({ enableDefaultRoutes: true });
  */
-function createiopress() {
-  return new iopress();
+function createiopress(options = {}) {
+  return new iopress(options);
 }
 
 /**

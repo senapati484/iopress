@@ -71,7 +71,8 @@ typedef struct {
 } http2_conn_t;
 
 /* Build HTTP/2 SETTINGS frame */
-static void http2_build_settings(uint8_t* out, size_t* out_len, bool ack) {
+static inline void http2_build_settings(uint8_t* out, size_t* out_len,
+                                        bool ack) {
   out[0] = 0x00;
   out[1] = 0x00;
   out[2] = ack ? 0x00 : 0x06;
@@ -93,7 +94,7 @@ static void http2_build_settings(uint8_t* out, size_t* out_len, bool ack) {
 }
 
 /* Build HTTP/2 PING frame */
-static void http2_build_ping(uint8_t* out, size_t* out_len, bool ack) {
+static inline void http2_build_ping(uint8_t* out, size_t* out_len, bool ack) {
   out[0] = 0x00;
   out[1] = 0x00;
   out[2] = 0x08;
@@ -112,8 +113,8 @@ static void http2_build_ping(uint8_t* out, size_t* out_len, bool ack) {
 }
 
 /* Build HTTP/2 WINDOW_UPDATE frame */
-static void http2_build_window_update(uint8_t* out, size_t* out_len,
-                                      uint32_t increment) {
+static inline void http2_build_window_update(uint8_t* out, size_t* out_len,
+                                             uint32_t increment) {
   out[0] = 0x00;
   out[1] = 0x00;
   out[2] = 0x04;
@@ -131,8 +132,8 @@ static void http2_build_window_update(uint8_t* out, size_t* out_len,
 }
 
 /* Simple HPACK encoder (static table only, no dynamic) */
-static size_t http2_encode_integer(uint8_t* out, uint32_t value,
-                                   int prefix_bits) {
+static inline size_t http2_encode_integer(uint8_t* out, uint32_t value,
+                                          int prefix_bits) {
   size_t i = 0;
   uint32_t mask = (1 << prefix_bits) - 1;
 
@@ -152,15 +153,13 @@ static size_t http2_encode_integer(uint8_t* out, uint32_t value,
 }
 
 /* Build HTTP/2 HEADERS frame with simple pseudo-headers */
-static size_t http2_build_response(uint8_t* out, uint16_t status,
-                                   const uint8_t* body, size_t body_len,
-                                   const char* content_type) {
-  size_t pos = 0;
+static inline size_t http2_build_response(uint8_t* out, uint16_t status,
+                                          const uint8_t* body, size_t body_len,
+                                          const char* content_type) {
   uint8_t* p = out;
 
   /* Frame header will be filled at the end */
   p += 9;
-  pos += 9;
 
   /* Encode pseudo-headers: :status, :method, :path, content-type */
   const char* status_str;
@@ -204,12 +203,10 @@ static size_t http2_build_response(uint8_t* out, uint16_t status,
   p += http2_encode_integer(p, status, 7);
   memcpy(p, status_str, 3);
   p += 3;
-  pos += 2 + 3;
 
   if (content_type) {
     /* content-type */
     *p++ = 0x4F; /* Indexed, index 31 */
-    pos++;
   }
 
   /* content-length */
@@ -221,12 +218,10 @@ static size_t http2_build_response(uint8_t* out, uint16_t status,
     size_t lenlen = strlen(lenstr);
     memcpy(p, lenstr, lenlen);
     p += lenlen;
-    pos += 2 + lenlen;
   }
 
   /* pad length = 0 */
   *p++ = 0x00;
-  pos++;
 
   /* END_HEADERS flag */
   out[4] = HTTP2_FLAG_END_HEADERS;

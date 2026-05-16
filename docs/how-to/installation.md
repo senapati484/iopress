@@ -44,9 +44,9 @@ Prebuilt binaries follow this naming pattern:
 express_pro_native-v{VERSION}-node-v{ABI}-{PLATFORM}-{ARCH}.tar.gz
 
 Examples:
-express_pro_native-v1.0.3-node-v115-linux-x64.tar.gz
-express_pro_native-v1.0.3-node-v115-darwin-arm64.tar.gz
-express_pro_native-v1.0.3-node-v115-win32-x64.tar.gz
+express_pro_native-v1.0.4-node-v115-linux-x64.tar.gz
+express_pro_native-v1.0.4-node-v115-darwin-arm64.tar.gz
+express_pro_native-v1.0.4-node-v115-win32-x64.tar.gz
 ```
 
 ### ABI Versions

@@ -1,6 +1,6 @@
 # iopress N-API Binding Contract
 
-> Version: 1.0.3
+> Version: 1.0.4
 > Last Updated: 2026-04-01
 
 This document defines the complete contract between the JavaScript layer and the native C implementation. Any engineer implementing `binding.c` should be able to do so using only this document.

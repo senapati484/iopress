@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-05-15T05:58:56.915Z",
+  "systemInfo": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 8,
+    "cpuModel": "Apple M2",
+    "totalMemory": 8192,
+    "freeMemory": 160,
+    "nodeVersion": "v20.18.0",
+    "v8Version": "11.3.244.8-node.23",
+    "uptime": 1214867
+  },
+  "platform": "darwin",
+  "target": {
+    "backend": "kqueue",
+    "minRps": 150000,
+    "targetRps": 215000,
+    "maxLatencyP99": 10
+  },
+  "results": {
+    "iopress": {
+      "hello-world": {
+        "scenario": "hello-world",
+        "stats": {
+          "rps": 185076,
+          "meanLatency": 26.78,
+          "p50": 24,
+          "p95": 0,
+          "p99": 75,
+          "maxLatency": 198,
+          "totalRequests": 925380,
+          "totalErrors": 0,
+          "throughput": "19.59"
+        },
+        "timestamp": "2026-05-15T05:58:56.913Z"
+      }
+    },
+    "express": {}
+  }
+}

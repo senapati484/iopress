@@ -31,7 +31,9 @@ typedef enum {
 /* Fast route entry */
 typedef struct fast_route_s {
   char method[8];
+  size_t method_len;
   char path[MAX_PATH_LEN];
+  size_t path_len;
   route_type_t type;
   uint16_t status_code;
   char content_type[64];
@@ -59,6 +61,8 @@ int fast_router_register(const char* method, const char* path,
                          route_type_t type, uint16_t status,
                          const char* content_type, const uint8_t* response,
                          size_t response_len);
+
+int fast_router_unregister(const char* method, const char* path);
 
 int fast_router_try_handle(const char* method, size_t method_len,
                            const char* path, size_t path_len,

@@ -58,8 +58,8 @@ static uint32_t hash_method_path(const char* method, size_t method_len,
 
 /* Add route to hash table with collision handling */
 static void add_route_to_hash(fast_route_t* route) {
-  uint32_t h = hash_method_path(route->method, strlen(route->method),
-                                route->path, strlen(route->path));
+  uint32_t h = hash_method_path(route->method, route->method_len, route->path,
+                                route->path_len);
 
   /* Use simple chaining for collisions */
   route->next = router.hash_table[h];
@@ -86,18 +86,44 @@ int fast_router_register(const char* method, const char* path,
                          route_type_t type, uint16_t status,
                          const char* content_type, const uint8_t* response,
                          size_t response_len) {
-  if (router.route_count >= MAX_FAST_ROUTES) {
-    return -1;
+  /* 1. Check if route already exists - if so, overwrite it */
+  size_t method_len = strlen(method);
+  size_t path_len = strlen(path);
+  uint32_t h = hash_method_path(method, method_len, path, path_len);
+  fast_route_t* route = router.hash_table[h];
+
+  while (route) {
+    if (route->method_len == method_len && route->path_len == path_len &&
+        memcmp(method, route->method, method_len) == 0 &&
+        memcmp(path, route->path, path_len) == 0) {
+      /* Found existing route - overwrite it */
+      break;
+    }
+    route = route->next;
   }
 
-  fast_route_t* route = &router.routes[router.route_count];
+  if (!route) {
+    /* 2. Create new route if not found */
+    if (router.route_count >= MAX_FAST_ROUTES) {
+      return -1;
+    }
+    route = &router.routes[router.route_count];
+    router.route_count++;
 
-  strncpy(route->method, method, 7);
-  route->method[7] = '\0';
+    strncpy(route->method, method, 7);
+    route->method[7] = '\0';
+    route->method_len = method_len;
 
-  strncpy(route->path, path, MAX_PATH_LEN - 1);
-  route->path[MAX_PATH_LEN - 1] = '\0';
+    strncpy(route->path, path, MAX_PATH_LEN - 1);
+    route->path[MAX_PATH_LEN - 1] = '\0';
+    route->path_len = path_len;
 
+    /* Add to hash only for NEW routes */
+    route->next = router.hash_table[h];
+    router.hash_table[h] = route;
+  }
+
+  /* 3. Populate route data (for both new and overwritten) */
   route->type = type;
   route->status_code = status;
   strncpy(route->content_type, content_type, 63);
@@ -116,14 +142,14 @@ int fast_router_register(const char* method, const char* path,
 
   /* HTTP/1.1 status line */
   if (status == 200) {
-    memcpy(p, "HTTP/1.1 200 OK\r\n", 16);
-    p += 16;
+    memcpy(p, "HTTP/1.1 200 OK\r\n", 17);
+    p += 17;
   } else if (status == 404) {
-    memcpy(p, "HTTP/1.1 404 Not Found\r\n", 24);
-    p += 24;
+    memcpy(p, "HTTP/1.1 404 Not Found\r\n", 25);
+    p += 25;
   } else {
-    memcpy(p, "HTTP/1.1 200 OK\r\n", 16);
-    p += 16;
+    memcpy(p, "HTTP/1.1 200 OK\r\n", 17);
+    p += 17;
   }
 
   /* Content-Length */
@@ -155,8 +181,8 @@ int fast_router_register(const char* method, const char* path,
   *p++ = '\n';
 
   /* Connection: keep-alive */
-  memcpy(p, "Connection: keep-alive\r\n", 23);
-  p += 23;
+  memcpy(p, "Connection: keep-alive\r\n", 24);
+  p += 24;
 
   /* End headers */
   *p++ = '\r';
@@ -170,11 +196,27 @@ int fast_router_register(const char* method, const char* path,
 
   route->full_response_len = p - (char*)out;
   route->active = true;
-  router.route_count++;
-
-  add_route_to_hash(route);
 
   return 0;
+}
+
+/* Unregister a fast route */
+int fast_router_unregister(const char* method, const char* path) {
+  size_t method_len = strlen(method);
+  size_t path_len = strlen(path);
+  uint32_t h = hash_method_path(method, method_len, path, path_len);
+  fast_route_t* route = router.hash_table[h];
+
+  while (route) {
+    if (route->method_len == method_len && route->path_len == path_len &&
+        memcmp(method, route->method, method_len) == 0 &&
+        memcmp(path, route->path, path_len) == 0) {
+      route->active = false;
+      return 0;
+    }
+    route = route->next;
+  }
+  return -1;
 }
 
 #if defined(__APPLE__)
@@ -197,7 +239,7 @@ int fast_router_try_handle(const char* method, size_t method_len,
                            const char* path, size_t path_len,
                            uint8_t** response_out, size_t* response_len_out,
                            uint16_t* status_out) {
-  if (method_len < 1 || method_len > 7 || path_len < 1) {
+  if (method_len < 3 || method_len > 7 || path_len < 1) {
     router.slow_falls++;
     return 1;
   }
@@ -205,14 +247,18 @@ int fast_router_try_handle(const char* method, size_t method_len,
   uint32_t h = hash_method_path(method, method_len, path, path_len);
   fast_route_t* route = router.hash_table[h];
 
-  if (route && route->active) {
-    if (strncasecmp_custom(method, route->method, 7) == 0) {
+  while (route) {
+    if (route->active && route->method_len == method_len &&
+        route->path_len == path_len && method[0] == route->method[0] &&
+        memcmp(path, route->path, path_len) == 0 &&
+        memcmp(method, route->method, method_len) == 0) {
       *response_out = route->response;
       *response_len_out = route->response_len;
       *status_out = route->status_code;
       router.fast_hits++;
       return 0;
     }
+    route = route->next;
   }
 
   router.slow_falls++;
@@ -230,7 +276,7 @@ int fast_router_try_handle_full(const char* method, size_t method_len,
                                 const char* path, size_t path_len,
                                 uint8_t** response_out,
                                 size_t* response_len_out) {
-  if (method_len < 1 || method_len > 7 || path_len < 1) {
+  if (method_len < 3 || method_len > 7 || path_len < 1) {
     router.slow_falls++;
     return 1;
   }
@@ -239,9 +285,10 @@ int fast_router_try_handle_full(const char* method, size_t method_len,
   fast_route_t* route = router.hash_table[h];
 
   while (route) {
-    if (route->active && strncasecmp_custom(method, route->method, 7) == 0 &&
-        strncmp(path, route->path, path_len) == 0 &&
-        route->path[path_len] == '\0') {
+    if (route->active && route->method_len == method_len &&
+        route->path_len == path_len && method[0] == route->method[0] &&
+        memcmp(path, route->path, path_len) == 0 &&
+        memcmp(method, route->method, method_len) == 0) {
       if (route->type == ROUTE_TYPE_STATIC_FILE && route->file_path[0]) {
         router.fast_hits++;
         return 2;
@@ -264,10 +311,14 @@ const char* fast_router_get_file_path(const char* method, size_t method_len,
   uint32_t h = hash_method_path(method, method_len, path, path_len);
   fast_route_t* route = router.hash_table[h];
 
-  if (route && route->active && route->type == ROUTE_TYPE_STATIC_FILE) {
-    if (strncasecmp_custom(method, route->method, 7) == 0) {
+  while (route) {
+    if (route->active && route->type == ROUTE_TYPE_STATIC_FILE &&
+        route->method_len == method_len && route->path_len == path_len &&
+        strncasecmp_custom(method, route->method, method_len) == 0 &&
+        memcmp(path, route->path, path_len) == 0) {
       return route->file_path;
     }
+    route = route->next;
   }
   return NULL;
 }

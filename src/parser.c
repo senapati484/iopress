@@ -207,6 +207,12 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   result->method = p;
   result->method_len = method_end - p;
 
+  /* Fast path for common methods */
+  bool is_get = false;
+  if (result->method_len == 3 && memcmp(p, "GET", 3) == 0) {
+    is_get = true;
+  }
+
   if (result->method_len == 0 || result->method_len > MAX_METHOD_LENGTH) {
     result->status = PARSE_STATUS_ERROR;
     result->error_code = ERROR_METHOD_TOO_LONG;
@@ -223,13 +229,13 @@ int http_parse_request(const uint8_t* buffer, size_t len,
 
   /* Find next space or end of line (end of path) */
   const char* path_start = p;
-  const char* path_end = NULL;
+  const char* path_end = memchr(p, ' ', end - p);
 
-  /* Look for space or end of line */
-  for (const char* q = p; q < end; q++) {
-    if (*q == ' ' || *q == '\r' || *q == '\n') {
-      path_end = q;
-      break;
+  if (path_end == NULL) {
+    /* No space found, look for CRLF */
+    path_end = memchr(p, '\r', end - p);
+    if (path_end == NULL) {
+      path_end = memchr(p, '\n', end - p);
     }
   }
 
@@ -244,12 +250,6 @@ int http_parse_request(const uint8_t* buffer, size_t len,
 
   result->path = path_start;
   result->path_len = path_end - path_start;
-
-  if (result->path_len == 0 || result->path_len > MAX_URI_LENGTH) {
-    result->status = PARSE_STATUS_ERROR;
-    result->error_code = ERROR_URI_TOO_LONG;
-    return result->status;
-  }
 
   /* Check for query string */
   const char* query_start = memchr(path_start, '?', result->path_len);
@@ -270,36 +270,17 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   }
 
   /* Check for HTTP version */
-  if (p + 8 < end && xp_strncasecmp_l(p, "HTTP/", 5) == 0 &&
-      isdigit((unsigned char)p[5]) && p[6] == '.' &&
-      isdigit((unsigned char)p[7])) {
+  if (p + 8 < end && p[0] == 'H' && p[1] == 'T' && p[2] == 'T' && p[3] == 'P' &&
+      p[4] == '/') {
     result->http_major = (uint8_t)(p[5] - '0');
     result->http_minor = (uint8_t)(p[7] - '0');
-
-    /* Move past version */
     p += 8;
   }
 
   /* Find end of line (CRLF or LF) */
-  const char* line_end = NULL;
-  if (p < end) {
-    if (*p == '\r' && p + 1 < end && *(p + 1) == '\n') {
-      /* CRLF */
-      line_end = p + 2;
-    } else if (*p == '\n') {
-      /* Bare LF */
-      line_end = p + 1;
-    } else if (*p == '\r') {
-      /* Need more data to check for LF */
-      return PARSE_STATUS_NEED_MORE;
-    }
-  }
-
-  if (line_end == NULL) {
-    return PARSE_STATUS_NEED_MORE;
-  }
-
-  p = line_end;
+  const char* line_end = memchr(p, '\n', end - p);
+  if (line_end == NULL) return PARSE_STATUS_NEED_MORE;
+  p = line_end + 1;
 
   /* =========================================================================
    * Step 2: Find end of headers (blank line)
@@ -309,39 +290,15 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   const char* headers_start = p;
   const char* headers_end = NULL;
 
-  /* Use memchr to find each line ending */
-  while (p < end) {
-    /* Find next newline */
-    const char* nl = memchr(p, '\n', end - p);
-    if (nl == NULL) {
-      /* No newline found - need more data */
-      return PARSE_STATUS_NEED_MORE;
+  /* Use memchr to find blank line directly: "\r\n\r\n" or "\n\n" */
+  const char* blank_line = xp_memmem(p, end - p, "\r\n\r\n", 4);
+  if (blank_line != NULL) {
+    headers_end = blank_line + 4;
+  } else {
+    blank_line = xp_memmem(p, end - p, "\n\n", 2);
+    if (blank_line != NULL) {
+      headers_end = blank_line + 2;
     }
-
-    /* Check if this is a blank line (end of headers) */
-    if (nl > p && *(nl - 1) == '\r') {
-      /* CRLF ending - check if line is empty (CRLF at start) */
-      if (nl - 1 == p) {
-        headers_end = nl + 1;
-        break;
-      }
-    } else {
-      /* Bare LF - check if at start */
-      if (nl == p) {
-        headers_end = nl + 1;
-        break;
-      }
-    }
-
-    /* Check header size limit */
-    if ((size_t)(nl - headers_start) > MAX_HEADER_SIZE) {
-      result->status = PARSE_STATUS_ERROR;
-      result->error_code = ERROR_HEADER_TOO_LARGE;
-      return result->status;
-    }
-
-    /* Move to next line */
-    p = nl + 1;
   }
 
   if (headers_end == NULL) {
@@ -360,6 +317,15 @@ int http_parse_request(const uint8_t* buffer, size_t len,
    * Step 3: Check for body (Content-Length or chunked encoding)
    * =========================================================================
    */
+
+  if (is_get) {
+    /* GET requests rarely have bodies */
+    result->body_present = false;
+    result->body_length = 0;
+    result->bytes_consumed = headers_end - (const char*)buf;
+    result->status = PARSE_STATUS_DONE;
+    return result->status;
+  }
 
   /* Check for chunked encoding first */
   /* (Simplified - just check for Transfer-Encoding: chunked) */

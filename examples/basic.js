@@ -30,8 +30,9 @@
 
 const iopress = require('../index.js');
 
-// Create application
-const app = iopress();
+// Create application with default routes disabled
+// Set enableDefaultRoutes: true to enable built-in demo routes (/health, /ping, /users, /echo, /search)
+const app = iopress({ enableDefaultRoutes: false });
 
 console.log('iopress v' + iopress.version);
 console.log('Platform:', iopress.platform);
