@@ -51,7 +51,7 @@ jobs:
         timeout-minutes: 10
         env:
           CI: true
-          # Cap heap so the runner doesn't OOM on large-body / memory tests
+          # Cap heap to prevent OOM on shared runners during memory/large-body tests
           NODE_OPTIONS: "--max-old-space-size=512"
         run: npm test
 
