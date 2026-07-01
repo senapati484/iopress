@@ -251,6 +251,11 @@ static int conn_write_buffered(kevent_context_t* ctx, connection_t* conn,
   return 0;
 }
 
+/* Forward declarations for the kevent write-notification helpers
+ * (defined further below; used by conn_write_iov before their definitions). */
+static void arm_write(kevent_context_t* ctx, int fd, connection_t* conn);
+static void disarm_write(kevent_context_t* ctx, int fd);
+
 /* Try to write data directly to socket. Returns bytes written on success,
  * 0 if kernel buffer is full (EAGAIN), -1 on error. For partial writes,
  * sets *remaining to the unwritten portion. */
@@ -261,6 +266,60 @@ static ssize_t try_write(int fd, const void* data, size_t len) {
     return -1;
   }
   return n;
+}
+
+/* writev() variant: pushes 2-3 iovecs (e.g. headers + body) in a single
+ * syscall. Falls back to a flattened write() on the rare system that
+ * lacks writev (none on macOS/Linux/BSD), and on EAGAIN concatenates
+ * the unwritten portion into conn->out_buffer. */
+static int conn_write_iov(kevent_context_t* ctx, connection_t* conn, int fd,
+                          const struct iovec* iov, int iovcnt) {
+  /* If we already have buffered data, append all iovecs serially. */
+  if (conn->out_buffer_len > 0) {
+    for (int i = 0; i < iovcnt; i++) {
+      if (conn_write_buffered(ctx, conn, iov[i].iov_base, iov[i].iov_len) < 0)
+        return -1;
+    }
+    return 0;
+  }
+
+  /* Try writev() first. writev is atomic for sockets, so a partial
+   * return only happens for EAGAIN. */
+  ssize_t n = writev(fd, iov, iovcnt);
+  if (n < 0) {
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+      close_connection(ctx, fd);
+      return -1;
+    }
+    n = 0;
+  }
+
+  if ((size_t)n == 0) {
+    /* EAGAIN — buffer everything and arm write. */
+    for (int i = 0; i < iovcnt; i++) {
+      if (conn_write_buffered(ctx, conn, iov[i].iov_base, iov[i].iov_len) < 0)
+        return -1;
+    }
+    arm_write(ctx, fd, conn);
+  } else {
+    /* Partial write. writev() on a socket is not guaranteed atomic, so
+     * we may have written part of one iovec. Walk forward. */
+    size_t remaining = (size_t)n;
+    for (int i = 0; i < iovcnt && remaining > 0; i++) {
+      if (remaining >= iov[i].iov_len) {
+        remaining -= iov[i].iov_len;
+        continue;
+      }
+      /* Partially wrote iov[i]. Buffer the tail. */
+      if (conn_write_buffered(ctx, conn,
+                              (const uint8_t*)iov[i].iov_base + remaining,
+                              iov[i].iov_len - remaining) < 0)
+        return -1;
+      remaining = 0;
+    }
+    if (conn->out_buffer_len > 0) arm_write(ctx, fd, conn);
+  }
+  return 0;
 }
 
 /* Enable kevent write notification for the connection (out_buffer has data) */
@@ -623,15 +682,15 @@ int server_send_response(server_handle_t s, connection_t* conn,
 
   size_t hlen = p - head;
 
-  /* 4. Write headers + body in a single syscall when body is small */
-  if (res->body && res->body_len > 0 && res->body_len <= 4096) {
-    char combined[16384];
-    memcpy(combined, head, hlen);
-    memcpy(combined + hlen, res->body, res->body_len);
-    if (conn_write(ctx, conn, combined, hlen + res->body_len) < 0) return -1;
-  } else if (res->body && res->body_len > 0) {
-    if (conn_write(ctx, conn, head, hlen) < 0) return -1;
-    if (conn_write(ctx, conn, res->body, res->body_len) < 0) return -1;
+  /* 4. Push headers + body in a single writev() syscall. Avoids the
+   * 16KB stack combined[] buffer and the 2nd write() for large bodies. */
+  if (res->body && res->body_len > 0) {
+    struct iovec iov[2];
+    iov[0].iov_base = head;
+    iov[0].iov_len = hlen;
+    iov[1].iov_base = (void*)res->body;
+    iov[1].iov_len = res->body_len;
+    if (conn_write_iov(ctx, conn, conn->fd, iov, 2) < 0) return -1;
   } else {
     if (conn_write(ctx, conn, head, hlen) < 0) return -1;
   }
