@@ -738,7 +738,15 @@ class iopress {
         throw new TypeError('Route handler must be a function');
       }
     }
-    this.routes.push({ method, path, handlers });
+    /* Pre-split the path once at registration time. _matchRoute would
+     * otherwise split it on every cache miss, which is wasted work
+     * for the (very common) static-route case. */
+    this.routes.push({
+      method,
+      path,
+      handlers,
+      _parts: path.split('/').filter(Boolean)
+    });
   }
 
   /**
@@ -777,15 +785,19 @@ class iopress {
       }
 
       const params = {};
-      const routeParts = route.path.split('/').filter(Boolean);
+      const routeParts = route._parts;
       const pathParts = path.split('/').filter(Boolean);
 
       if (routeParts.length !== pathParts.length) continue;
 
       let match = true;
       for (let i = 0; i < routeParts.length; i++) {
-        if (routeParts[i].startsWith(':')) {
-          params[routeParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+        if (routeParts[i][0] === ':') {
+          /* Skip decodeURIComponent for unencoded values — the fast
+           * path covers the common case of plain ASCII param values. */
+          const part = pathParts[i];
+          params[routeParts[i].slice(1)] =
+            part.indexOf('%') >= 0 ? decodeURIComponent(part) : part;
         } else if (routeParts[i] !== pathParts[i]) {
           match = false;
           break;
