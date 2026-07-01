@@ -130,7 +130,3 @@ jobs:
             --generate-notes \
             release-binaries/*.tar.gz
 
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
