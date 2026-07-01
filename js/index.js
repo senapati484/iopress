@@ -340,7 +340,6 @@ class Response {
    */
   json(obj) {
     const body = JSON.stringify(obj);
-    this._cachedBody = body;
     this.set('Content-Type', 'application/json');
     return this.send(body);
   }
@@ -368,7 +367,6 @@ class Response {
     }
 
     const bodyStr = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
-    this._cachedBody = bodyStr;
 
     if (!this.get('content-type')) {
       this.set('Content-Type', 'text/plain; charset=utf-8');
