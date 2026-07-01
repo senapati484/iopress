@@ -38,7 +38,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format
+          sudo apt-get install -y liburing-dev clang-format
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'

@@ -28,7 +28,7 @@
     "rebuild": "node-gyp rebuild",
     "configure": "node-gyp configure",
     "clean": "node-gyp clean",
-    "test": "node --pending-deprecation --test --test-timeout=30000 test/*.test.js test/test.js",
+    "test": "node --pending-deprecation --test --test-timeout=30000 test/default-routes.test.js test/deprecation.test.js test/integration.test.js test/large-body.test.js test/large-response.test.js test/memory.test.js test/streaming.test.js test/test.js",
     "bench": "node benchmarks/run.js",
     "bench:compare": "node benchmarks/run.js --compare",
     "bench:ci": "node benchmarks/run.js --ci",
