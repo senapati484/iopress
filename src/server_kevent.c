@@ -595,8 +595,13 @@ int server_send_response(server_handle_t s, connection_t* conn,
   /* 2. Headers — memcpy only, no snprintf */
   if (res->headers) {
     for (size_t i = 0; i < res->header_count * 2 && res->headers[i]; i += 2) {
-      size_t kn = strlen(res->headers[i]);
-      size_t vn = strlen(res->headers[i + 1]);
+      /* Use pre-threaded lengths when the binding provides them (avoids
+       * 3 strlen walks per header). Fall back to strlen for the libuv
+       * stub and the no-op backends. */
+      size_t kn =
+          res->header_lens ? res->header_lens[i] : strlen(res->headers[i]);
+      size_t vn = res->header_lens ? res->header_lens[i + 1]
+                                   : strlen(res->headers[i + 1]);
       if (p + kn + 2 + vn + 2 <= end) {
         memcpy(p, res->headers[i], kn);
         p += kn;

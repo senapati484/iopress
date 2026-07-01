@@ -420,6 +420,7 @@ static napi_value SendResponse(napi_env env, napi_callback_info info) {
 
   const char* headers[256];
   char* header_strings[256];
+  size_t header_lens[256];
   uint32_t k = 0;
 
   for (uint32_t i = 0; i < header_count && k < 254; i++) {
@@ -435,6 +436,7 @@ static napi_value SendResponse(napi_env env, napi_callback_info info) {
     napi_get_value_string_utf8(env, key_val, header_strings[k], key_len + 1,
                                &key_len);
     headers[k] = header_strings[k];
+    header_lens[k] = key_len;
     k++;
 
     napi_get_value_string_utf8(env, val_val, NULL, 0, &val_len);
@@ -442,10 +444,12 @@ static napi_value SendResponse(napi_env env, napi_callback_info info) {
     napi_get_value_string_utf8(env, val_val, header_strings[k], val_len + 1,
                                &val_len);
     headers[k] = header_strings[k];
+    header_lens[k] = val_len;
     k++;
   }
 
   res.headers = headers;
+  res.header_lens = header_lens;
   res.header_count = k / 2;
 
   server_send_response(g_context.server, conn, &res);

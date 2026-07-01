@@ -45,6 +45,11 @@ typedef struct {
   const uint8_t* body;
   size_t body_len;
   const char** headers;
+  /* Parallel length array, 2*header_count entries, [name_len, val_len, ...].
+   * May be NULL, in which case consumers fall back to strlen(headers[i]).
+   * When non-NULL, avoids 3 strlen walks per header (size probe in NAPI,
+   * copy in NAPI, plus the strlen in server_kevent). */
+  const size_t* header_lens;
   size_t header_count;
   bool is_last;
 } response_t;
