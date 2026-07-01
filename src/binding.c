@@ -160,10 +160,14 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
     napi_set_named_property(env, req_obj, "body", val);
   }
 
-  /* 1b. Build headers object. Parser already extracted and lower-cased
+  /* 1b. Build headers object. Parser already extracted (case-preserved)
    * them into req_data->result.header_names / header_values (zero-copy,
-   * points into the request buffer). We allocate one JS object and set
-   * each (name, value) pair as a property. */
+   * points into the request buffer). One napi_create_object + 2*n
+   * napi_create_string_utf8 (with pre-known lengths, no double walk)
+   * + n napi_set_property. napi_set_property is required (vs
+   * napi_set_named_property) because the header names point into the
+   * request buffer which is NOT NUL-terminated, and the named variant
+   * takes a C string (NUL-terminated). */
   {
     napi_value headers_obj;
     status = napi_create_object(env, &headers_obj);

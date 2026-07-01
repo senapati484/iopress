@@ -199,8 +199,21 @@ class Request {
     this.query = queryIdx >= 0 ? parseQuery(this.url.slice(queryIdx + 1)) : {};
     this.params = {};
 
-    // Parse body
-    const contentType = this.headers['content-type'] || this.headers['Content-Type'];
+    // Parse body (content-type lookup is case-insensitive per RFC 7230;
+    // the C parser preserves the original case, so we check the two
+    // most common casings before falling back to a scan)
+    const h = this.headers;
+    let contentType = h['content-type'];
+    if (contentType === undefined) {
+      contentType = h['Content-Type'];
+      if (contentType === undefined) {
+        for (const k in h) {
+          if (k.length === 12 && k.toLowerCase() === 'content-type') {
+            contentType = h[k]; break;
+          }
+        }
+      }
+    }
     this.body = parseBody(this.rawBody, contentType);
 
     // Internal

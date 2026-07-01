@@ -319,13 +319,15 @@ int http_parse_request(const uint8_t* buffer, size_t len,
 
   /* =========================================================================
    * Step 2.5: Extract headers. We have headers_start..headers_end; walk
-   * each line, split on first ':' into name + value, lower-case the name,
-   * trim leading whitespace from value, and append to result arrays. The
-   * pointers stay into the request buffer (zero-copy). Done before the
-   * body-length check so binding.c can hand the JS layer a populated
-   * req.headers on the slow path.
-   * =========================================================================
-   */
+   * each line, split on first ':' into name + value, and append to the
+   * result arrays. The pointers stay into the request buffer (zero-copy).
+   *
+   * Note: we deliberately do NOT lowercase the name in place. The JS
+   * Request constructor (req.get / headers[]) and parseBody both already
+   * do case-insensitive lookups, so the in-place lowercase is a per-byte
+   * write that buys nothing. Keeping the raw case is also more spec-
+   * conformant (RFC 7230 says header names are case-insensitive, not
+   * that they must be lowercase). */
   {
     const char* hp = headers_start;
     while (hp < headers_end && result->header_count < MAX_HEADERS) {
@@ -359,13 +361,6 @@ int http_parse_request(const uint8_t* buffer, size_t len,
         result->status = PARSE_STATUS_ERROR;
         result->error_code = ERROR_HEADER_TOO_LARGE;
         return result->status;
-      }
-      /* Lowercase the name in place. The buffer is mutable from the
-       * server's perspective (it's the read buffer), so this is safe
-       * and avoids a copy. */
-      for (size_t i = 0; i < name_len; i++) {
-        const char c = name[i];
-        if (c >= 'A' && c <= 'Z') ((char*)name)[i] = (char)(c + ('a' - 'A'));
       }
       result->header_names[result->header_count] = name;
       result->header_name_lens[result->header_count] = name_len;
