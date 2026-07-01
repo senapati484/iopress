@@ -2,22 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - 2026-07-01
-
-### Added
-- `app.metrics()` — atomic counters for pending/total/drops/errors
-- Windows MSVC compatibility — `_InterlockedExchangeAdd64` replaces C11 `<stdatomic.h>`
-
-### Fixed
-- **CRITICAL**: `req.headers` was always `{}` on native path (`3ba6527`)
-- Dependabot CVE: uuid updated to `11.1.1` via overrides
-
-### Changed
-- Merged method/path/query into single heap allocation (3→1 per request)
-- Typeof fast-path in `Response.send()` skips `String()` built-in for strings
-- Stack buffer in `SendResponse` header extraction halves N-API calls
-- Renamed atomic macros to `ATOMIC_INC`/`ATOMIC_DEC`/`ATOMIC_READ` for platform clarity
-
 ## [1.0.5] - 2026-07-01
 
 ### Fixed

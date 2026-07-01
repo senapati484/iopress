@@ -1,6 +1,6 @@
 {
   "name": "@iopress/core",
-  "version": "1.1.0",
+  "version": "1.0.5",
   "description": "Ultra-fast HTTP framework powered by io_uring and C native addons. 30x faster than Express.",
   "main": "index.js",
   "types": "index.d.ts",
@@ -20,7 +20,7 @@
     "LICENSE",
     "CHANGELOG.md",
     "benchmarks/",
-    "benchmark/"
+    "!benchmarks/results/"
   ],
   "scripts": {
     "install": "prebuild-install || node-gyp rebuild",
