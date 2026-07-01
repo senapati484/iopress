@@ -386,7 +386,7 @@ class iopress {
 
       if (index >= handlers.length) {
         if (!res._sent) {
-          res.status(404).json({ error: 'Not Found', path: req.path, method: req.method });
+          res.status(404).json({ error: 'Not Found', path: encodeURI(req.path), method: req.method });
         }
         return;
       }
@@ -473,7 +473,7 @@ class iopress {
 
           self._executeChain(req, res, chain);
         } else {
-          res.status(404).json({ error: 'Not Found', path: req.path, method: req.method });
+          res.status(404).json({ error: 'Not Found', path: encodeURI(req.path), method: req.method });
         }
       });
     });
