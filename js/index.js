@@ -366,7 +366,11 @@ class Response {
       return this;
     }
 
-    const bodyStr = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
+    /* Fast path: typeof check avoids V8 String() built-in call
+     * when data is already a string (common case from JSON.stringify). */
+    const bodyStr = typeof data === 'string' ? data :
+      Buffer.isBuffer(data) ? data.toString('utf8') :
+        String(data);
 
     if (!this.get('content-type')) {
       this.set('Content-Type', 'text/plain; charset=utf-8');

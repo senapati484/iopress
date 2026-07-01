@@ -72,7 +72,8 @@
                 "InlineFunctionExpansion": 2,
                 "EnableIntrinsicFunctions": "true",
                 "FavorSizeOrSpeed": 1,
-                "DisableSpecificWarnings": ["4201", "4214", "4115", "4996"]
+                "DisableSpecificWarnings": ["4201", "4214", "4115", "4996"],
+                "AdditionalOptions": ["/std:c11"]
               }
             }
           }
