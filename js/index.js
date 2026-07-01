@@ -29,6 +29,15 @@ const os = require('os');
 // eslint-disable-next-line no-unused-vars
 const { spawn } = require('child_process');
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 if (process.env.IOPRESS_WORKER === '1') {
   module.exports = function() {
     const app = { routes: [], middleware: [], params: {} };
@@ -367,12 +376,20 @@ class Response {
       return this;
     }
 
-    const bodyStr = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
-    this._cachedBody = bodyStr;
-
     if (!this.get('content-type')) {
       this.set('Content-Type', 'text/plain; charset=utf-8');
     }
+
+    this.set('X-Content-Type-Options', 'nosniff');
+
+    let bodyStr;
+    if (Buffer.isBuffer(data)) {
+      bodyStr = data.toString('utf8');
+    } else {
+      const str = String(data);
+      bodyStr = this._shouldEscape() ? escapeHtml(str) : str;
+    }
+    this._cachedBody = bodyStr;
 
     this._binding.SendResponse(
       this._fd,
@@ -383,6 +400,18 @@ class Response {
 
     this._sent = true;
     return this;
+  }
+
+  _shouldEscape() {
+    const ct = this.get('content-type');
+    if (!ct) return true;
+    const lower = ct.toLowerCase();
+    if (lower.startsWith('image/') || lower.startsWith('video/') ||
+        lower.startsWith('audio/') || lower === 'application/json' ||
+        lower.includes('octet-stream') || lower.startsWith('multipart/')) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -982,7 +1011,7 @@ class iopress {
 
         self._executeChain(req, res, chain);
       } else {
-        res.status(404).json({ error: 'Not Found', path: req.path, method: req.method });
+        res.status(404).json({ error: 'Not Found', path: encodeURI(req.path), method: req.method });
       }
     });
 
