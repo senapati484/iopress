@@ -332,6 +332,12 @@ static void reset_connection(connection_t* conn) {
   conn->headers_sent = false;
   conn->user_data = NULL;
 
+  if (conn->assembled_body) {
+    free(conn->assembled_body);
+    conn->assembled_body = NULL;
+    conn->assembled_body_len = 0;
+  }
+
   /* Reset output buffer state but keep allocation for reuse */
   conn->out_buffer_len = 0;
   conn->out_buffer_pos = 0;
@@ -364,6 +370,12 @@ static void close_connection(uring_context_t* ctx, int fd) {
     if (conn->platform_sqe_data_send) {
       free(conn->platform_sqe_data_send);
       conn->platform_sqe_data_send = NULL;
+    }
+
+    if (conn->assembled_body) {
+      free(conn->assembled_body);
+      conn->assembled_body = NULL;
+      conn->assembled_body_len = 0;
     }
 
     /* Free output buffer */

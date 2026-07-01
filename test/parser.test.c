@@ -485,6 +485,175 @@ void test_partial_headers(void) {
 }
 
 /* ============================================================================
+ * Chunked Transfer Encoding Tests
+ * ============================================================================
+ */
+void test_chunked_body_valid(void) {
+  TEST_START("chunked body valid (5\\r\\nhello\\r\\n0\\r\\n\\r\\n)");
+
+  const char* request =
+      "POST /echo HTTP/1.1\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "5\r\n"
+      "hello\r\n"
+      "0\r\n"
+      "\r\n";
+
+  parse_result_t result;
+  int status =
+      http_parse_request((const uint8_t*)request, strlen(request), &result);
+
+  if (status != PARSE_STATUS_DONE) {
+    FAIL("expected PARSE_STATUS_DONE");
+    return;
+  }
+  if (!result.body_present) {
+    FAIL("expected body_present = 1");
+    return;
+  }
+  if (result.body_length != 5) {
+    FAIL("expected body_length = 5");
+    return;
+  }
+  /* body_start points to raw chunked data, not assembled body */
+  const char* expected_body = strstr(request, "\r\n\r\n") + 4;
+  if (result.body_start != (size_t)(expected_body - request)) {
+    FAIL("body_start incorrect");
+    return;
+  }
+
+  PASS();
+}
+
+void test_chunked_body_empty(void) {
+  TEST_START("chunked body empty (0\\r\\n\\r\\n)");
+
+  const char* request =
+      "POST /echo HTTP/1.1\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "0\r\n"
+      "\r\n";
+
+  parse_result_t result;
+  int status =
+      http_parse_request((const uint8_t*)request, strlen(request), &result);
+
+  if (status != PARSE_STATUS_DONE) {
+    FAIL("expected PARSE_STATUS_DONE");
+    return;
+  }
+  if (!result.body_present) {
+    FAIL("expected body_present = 1");
+    return;
+  }
+  if (result.body_length != 0) {
+    FAIL("expected body_length = 0");
+    return;
+  }
+
+  PASS();
+}
+
+void test_chunked_body_oversized_chunk(void) {
+  TEST_START("chunked oversize PoC (1000 declared, 0 sent)");
+
+  const char* request =
+      "POST /echo HTTP/1.1\r\n"
+      "Host: x\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "1000\r\n"
+      "0\r\n"
+      "\r\n";
+
+  parse_result_t result;
+  int status =
+      http_parse_request((const uint8_t*)request, strlen(request), &result);
+
+  if (status == PARSE_STATUS_DONE) {
+    FAIL("must NOT return DONE for oversized chunk");
+    return;
+  }
+
+  PASS();
+}
+
+void test_chunked_body_partial(void) {
+  TEST_START("chunked body partial (missing chunk data)");
+
+  const char* request =
+      "POST /echo HTTP/1.1\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "5\r\n"
+      "hel"; /* Only 3 of 5 bytes sent, no terminator */
+
+  parse_result_t result;
+  int status =
+      http_parse_request((const uint8_t*)request, strlen(request), &result);
+
+  if (status == PARSE_STATUS_DONE) {
+    FAIL("must NOT return DONE for partial chunk data");
+    return;
+  }
+
+  PASS();
+}
+
+void test_chunked_body_missing_terminator(void) {
+  TEST_START("chunked body missing final terminator");
+
+  const char* request =
+      "POST /echo HTTP/1.1\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "5\r\n"
+      "hello\r\n"; /* No 0\r\n\r\n terminator */
+
+  parse_result_t result;
+  int status =
+      http_parse_request((const uint8_t*)request, strlen(request), &result);
+
+  if (status == PARSE_STATUS_DONE) {
+    FAIL("must NOT return DONE without terminator");
+    return;
+  }
+
+  PASS();
+}
+
+void test_chunked_body_missing_crlf(void) {
+  TEST_START("chunked body missing CRLF after chunk data");
+
+  const char* request =
+      "POST /echo HTTP/1.1\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "5\r\n"
+      "hello" /* No CRLF after data */
+      "0\r\n"
+      "\r\n";
+
+  parse_result_t result;
+  int status =
+      http_parse_request((const uint8_t*)request, strlen(request), &result);
+
+  if (status == PARSE_STATUS_DONE) {
+    FAIL("must NOT return DONE without trailing CRLF");
+    return;
+  }
+
+  PASS();
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -507,6 +676,14 @@ int main(void) {
   test_empty_path();
   test_zero_content_length();
   test_partial_headers();
+
+  /* Chunked encoding tests */
+  test_chunked_body_valid();
+  test_chunked_body_empty();
+  test_chunked_body_oversized_chunk();
+  test_chunked_body_partial();
+  test_chunked_body_missing_terminator();
+  test_chunked_body_missing_crlf();
 
   /* Summary */
   printf("\n============================================================\n");

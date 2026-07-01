@@ -32,6 +32,7 @@ typedef struct parse_result_s {
   bool body_present;
   size_t body_length;
   size_t bytes_consumed;
+  bool chunked;
 } parse_result_t;
 
 #ifdef __cplusplus
@@ -61,6 +62,10 @@ int http_parse_request(const uint8_t* buffer, size_t len,
  */
 int parse_append_body(connection_t* conn, const uint8_t* new_data,
                       size_t new_len, parse_result_t* result);
+
+int http_assemble_chunked_body(const uint8_t* buffer,
+                               const parse_result_t* result, uint8_t* output,
+                               size_t output_cap);
 
 #ifdef __cplusplus
 }

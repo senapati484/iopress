@@ -20,6 +20,13 @@ extern "C" {
 #include <stdint.h>
 #include <sys/types.h>
 
+#ifdef _MSC_VER
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#endif
+
 #define DEFAULT_INITIAL_BUFFER_SIZE 16384
 #define DEFAULT_MAX_BODY_SIZE 1048576
 #define MAX_CONNECTIONS 100000

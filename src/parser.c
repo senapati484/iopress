@@ -16,33 +16,30 @@
 
 #include "server.h"
 
-/* Suppress unused function warning for fallback implementation */
-#if defined(__APPLE__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-function"
-#endif
-
-/* xp_memmem is a GNU extension, not in POSIX.1-2001 */
-/* Provide our own implementation to avoid conflicts */
-static void* xp_memmem(const void* haystack, size_t haystack_len,
-                       const void* needle, size_t needle_len) {
-  if (needle_len == 0) return (void*)haystack;
-  if (haystack_len < needle_len) return NULL;
-
-  const char* h = haystack;
-  const char* n = needle;
-
-  for (size_t i = 0; i <= haystack_len - needle_len; i++) {
-    if (memcmp(h + i, n, needle_len) == 0) {
-      return (void*)(h + i);
+static const char* find_header_boundary(const char* buf, size_t len) {
+  if (len < 4) {
+    if (len >= 2 && buf[len - 2] == '\n' && buf[len - 1] == '\n') {
+      return buf + len - 2;
     }
+    if (len >= 2 && buf[0] == '\r' && buf[1] == '\n') {
+      return buf;
+    }
+    return NULL;
+  }
+  const char* end = buf + len - 3;
+  for (const char* p = buf; p < end; p++) {
+    if (p[0] == '\r' && p[1] == '\n' && p[2] == '\r' && p[3] == '\n') {
+      return p;
+    }
+    if (p[0] == '\n' && p[1] == '\n') {
+      return p;
+    }
+  }
+  if (buf[len - 2] == '\n' && buf[len - 1] == '\n') {
+    return buf + len - 2;
   }
   return NULL;
 }
-
-#if defined(__APPLE__)
-#pragma clang diagnostic pop
-#endif
 
 /* ============================================================================
  * Error Codes
@@ -290,13 +287,17 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   const char* headers_start = p;
   const char* headers_end = NULL;
 
-  /* Use memchr to find blank line directly: "\r\n\r\n" or "\n\n" */
-  const char* blank_line = xp_memmem(p, end - p, "\r\n\r\n", 4);
+  /* Use highly optimized, single-pass boundary scanner */
+  const char* blank_line = find_header_boundary(p, end - p);
   if (blank_line != NULL) {
-    headers_end = blank_line + 4;
-  } else {
-    blank_line = xp_memmem(p, end - p, "\n\n", 2);
-    if (blank_line != NULL) {
+    if (blank_line[0] == '\r' && blank_line[1] == '\n') {
+      size_t remaining = end - blank_line;
+      if (remaining >= 4 && blank_line[2] == '\r' && blank_line[3] == '\n') {
+        headers_end = blank_line + 4;
+      } else {
+        headers_end = blank_line + 2;
+      }
+    } else {
       headers_end = blank_line + 2;
     }
   }
@@ -351,8 +352,8 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   }
 
   if (chunked) {
-    /* B9: Chunked encoding - check if complete chunked body received */
     result->body_present = true;
+    result->chunked = true;
     result->body_length = 0;
     result->bytes_consumed = headers_end - (const char*)buf;
 
@@ -362,26 +363,10 @@ int http_parse_request(const uint8_t* buffer, size_t len,
       return result->status;
     }
 
-    const char* body_start = (const char*)buf + result->body_start;
-
-    /* Check for final chunk terminator: "0\r\n\r\n" */
-    const char* term = xp_memmem(body_start, body_received, "0\r\n\r\n", 5);
-    if (term == NULL) {
-      result->status = PARSE_STATUS_NEED_MORE;
-      return result->status;
-    }
-
-    /* Verify there's at least one chunk before the final 0 */
-    const char* first_crlf = memchr(body_start, '\r', body_received);
-    if (first_crlf == NULL || first_crlf >= term) {
-      result->status = PARSE_STATUS_NEED_MORE;
-      return result->status;
-    }
-
-    /* Calculate total assembled size by parsing all chunks */
+    const uint8_t* p = (const uint8_t*)buf + result->body_start;
+    const uint8_t* body_end = p + body_received;
     size_t assembled_size = 0;
-    const uint8_t* p = (const uint8_t*)body_start;
-    const uint8_t* body_end = (const uint8_t*)body_start + body_received;
+    bool found_final = false;
 
     while (p < body_end) {
       const uint8_t* nl = memchr(p, '\n', body_end - p);
@@ -391,27 +376,76 @@ int http_parse_request(const uint8_t* buffer, size_t len,
       const uint8_t* sp = p;
       while (sp < nl) {
         char c = (char)*sp;
-        if (c >= '0' && c <= '9')
-          chunk_size = chunk_size * 16 + (c - '0');
-        else if (c >= 'a' && c <= 'f')
-          chunk_size = chunk_size * 16 + (c - 'a' + 10);
-        else if (c >= 'A' && c <= 'F')
-          chunk_size = chunk_size * 16 + (c - 'A' + 10);
-        else if (c == '\r' || c == ';')
+        if (c >= '0' && c <= '9') {
+          size_t digit = (size_t)(c - '0');
+          if (chunk_size > (SIZE_MAX - digit) / 16) {
+            result->status = PARSE_STATUS_ERROR;
+            result->error_code = ERROR_BODY_TOO_LARGE;
+            return result->status;
+          }
+          chunk_size = chunk_size * 16 + digit;
+        } else if (c >= 'a' && c <= 'f') {
+          size_t digit = (size_t)(c - 'a' + 10);
+          if (chunk_size > (SIZE_MAX - digit) / 16) {
+            result->status = PARSE_STATUS_ERROR;
+            result->error_code = ERROR_BODY_TOO_LARGE;
+            return result->status;
+          }
+          chunk_size = chunk_size * 16 + digit;
+        } else if (c >= 'A' && c <= 'F') {
+          size_t digit = (size_t)(c - 'A' + 10);
+          if (chunk_size > (SIZE_MAX - digit) / 16) {
+            result->status = PARSE_STATUS_ERROR;
+            result->error_code = ERROR_BODY_TOO_LARGE;
+            return result->status;
+          }
+          chunk_size = chunk_size * 16 + digit;
+        } else if (c == '\r' || c == ';') {
           break;
-        else
+        } else {
           break;
+        }
         sp++;
       }
 
       p = nl + 1;
-      if (chunk_size == 0) break;
+
+      if (chunk_size == 0) {
+        found_final = true;
+        size_t remaining = body_end - p;
+        if (remaining >= 2 && p[0] == '\r' && p[1] == '\n') {
+          p += 2;
+        }
+        break;
+      }
+
+      if (chunk_size > SIZE_MAX - 2 ||
+          (size_t)(body_end - p) < chunk_size + 2) {
+        result->status = PARSE_STATUS_NEED_MORE;
+        return result->status;
+      }
+
+      if (assembled_size > SIZE_MAX - chunk_size) {
+        result->status = PARSE_STATUS_ERROR;
+        result->error_code = ERROR_BODY_TOO_LARGE;
+        return result->status;
+      }
+
+      if (p[chunk_size] != '\r' || p[chunk_size + 1] != '\n') {
+        result->status = PARSE_STATUS_ERROR;
+        result->error_code = ERROR_MALFORMED_REQUEST;
+        return result->status;
+      }
+
       p += chunk_size + 2;
       assembled_size += chunk_size;
     }
 
     result->body_length = assembled_size;
-    result->status = PARSE_STATUS_DONE;
+    if (found_final) {
+      result->bytes_consumed = (const char*)p - (const char*)buf;
+    }
+    result->status = found_final ? PARSE_STATUS_DONE : PARSE_STATUS_NEED_MORE;
     return result->status;
   }
 
@@ -515,4 +549,53 @@ int parse_append_body(connection_t* conn, const uint8_t* new_data,
   }
 
   return result->status;
+}
+
+int http_assemble_chunked_body(const uint8_t* buffer,
+                               const parse_result_t* result, uint8_t* output,
+                               size_t output_cap) {
+  if (!result->chunked || !result->body_present || result->body_length == 0 ||
+      output == NULL || output_cap == 0) {
+    return 0;
+  }
+
+  const uint8_t* p = buffer + result->body_start;
+  const uint8_t* body_end = buffer + result->bytes_consumed;
+  size_t written = 0;
+
+  while (p < body_end) {
+    const uint8_t* nl = memchr(p, '\n', body_end - p);
+    if (!nl) break;
+
+    size_t chunk_size = 0;
+    const uint8_t* sp = p;
+    while (sp < nl) {
+      char c = (char)*sp;
+      if (c >= '0' && c <= '9')
+        chunk_size = chunk_size * 16 + (c - '0');
+      else if (c >= 'a' && c <= 'f')
+        chunk_size = chunk_size * 16 + (c - 'a' + 10);
+      else if (c >= 'A' && c <= 'F')
+        chunk_size = chunk_size * 16 + (c - 'A' + 10);
+      else if (c == '\r' || c == ';')
+        break;
+      else
+        break;
+      sp++;
+    }
+
+    p = nl + 1;
+    if (chunk_size == 0) break;
+
+    size_t to_copy = chunk_size;
+    if (written + to_copy > output_cap) {
+      to_copy = output_cap - written;
+    }
+    memcpy(output + written, p, to_copy);
+    written += to_copy;
+
+    p += chunk_size + 2;
+  }
+
+  return (int)written;
 }

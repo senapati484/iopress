@@ -1,6 +1,13 @@
 # Build artifacts
 build/
 *.node
+test/parser.test
+test/test_parser
+test/test_router
+test/test_router_bin
+
+# Benchmark results
+benchmarks/results/
 
 # Dependencies
 node_modules/

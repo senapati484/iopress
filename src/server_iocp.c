@@ -78,6 +78,7 @@ typedef struct {
   SOCKET listen_socket;
   bool running;
   HANDLE worker_threads[WORKER_THREADS];
+  HANDLE accept_thread;
 
   server_config_t config;
   request_callback_t on_request;
@@ -344,6 +345,12 @@ static void reset_connection(connection_t* conn) {
   conn->headers_sent = false;
   conn->user_data = NULL;
 
+  if (conn->assembled_body) {
+    free(conn->assembled_body);
+    conn->assembled_body = NULL;
+    conn->assembled_body_len = 0;
+  }
+
   /* Reset output buffer state but keep allocation for reuse */
   conn->out_buffer_len = 0;
   conn->out_buffer_pos = 0;
@@ -368,14 +375,11 @@ static void close_connection(iocp_context_t* ctx, SOCKET fd) {
     }
     conn->buffer_cap = 0;
 
-    /* Free output buffer */
-    if (conn->out_buffer) {
-      free(conn->out_buffer);
-      conn->out_buffer = NULL;
+    if (conn->assembled_body) {
+      free(conn->assembled_body);
+      conn->assembled_body = NULL;
+      conn->assembled_body_len = 0;
     }
-    conn->out_buffer_cap = 0;
-    conn->out_buffer_len = 0;
-    conn->out_buffer_pos = 0;
 
     /* Free output buffer */
     if (conn->out_buffer) {
@@ -449,8 +453,8 @@ static DWORD WINAPI worker_thread(LPVOID param) {
                 (iocp_overlapped_t*)conn->platform_sqe_data_recv;
             if (next_ov) {
               memset(&next_ov->overlapped, 0, sizeof(OVERLAPPED));
-              next_ov->wsabuf.buf = next_ov->buffer;
-              next_ov->wsabuf.len = BUFFER_SIZE;
+              next_ov->wsabuf.buf = conn->buffer;
+              next_ov->wsabuf.len = (ULONG)conn->buffer_cap;
 
               DWORD received = 0;
               DWORD flags = 0;
@@ -475,7 +479,7 @@ static DWORD WINAPI worker_thread(LPVOID param) {
         conn->buffer_len = bytes_transferred;
 
         parse_result_t result;
-        int status = http_parse_request((const uint8_t*)ov->buffer,
+        int status = http_parse_request((const uint8_t*)conn->buffer,
                                         conn->buffer_len, &result);
 
         if (status == PARSE_STATUS_DONE) {
@@ -510,8 +514,8 @@ static DWORD WINAPI worker_thread(LPVOID param) {
 
         /* Re-arm RECV using the same object */
         memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
-        ov->wsabuf.buf = ov->buffer;
-        ov->wsabuf.len = BUFFER_SIZE;
+        ov->wsabuf.buf = conn->buffer;
+        ov->wsabuf.len = (ULONG)conn->buffer_cap;
 
         DWORD received = 0;
         DWORD flags = 0;
@@ -524,11 +528,50 @@ static DWORD WINAPI worker_thread(LPVOID param) {
         /* Send completion - cleanup dynamic SEND object */
         connection_t* conn = (connection_t*)key;
         if (bytes_transferred > 0) {
-          /* Handle completion/reset if needed */
-          if (conn->request_complete && conn->headers_sent &&
-              !conn->keep_alive) {
-            close_connection(ctx, (SOCKET)conn->fd);
+          conn->out_buffer_pos += bytes_transferred;
+          if (conn->out_buffer_pos < conn->out_buffer_len) {
+            /* Queue the next chunk of the buffer */
+            iocp_overlapped_t* next_ov = malloc(sizeof(iocp_overlapped_t));
+            if (next_ov) {
+              memset(next_ov, 0, sizeof(iocp_overlapped_t));
+              next_ov->type = OP_SEND;
+              next_ov->conn = conn;
+
+              size_t to_send =
+                  (conn->out_buffer_len - conn->out_buffer_pos) > BUFFER_SIZE
+                      ? BUFFER_SIZE
+                      : (conn->out_buffer_len - conn->out_buffer_pos);
+              memcpy(next_ov->buffer, conn->out_buffer + conn->out_buffer_pos,
+                     to_send);
+              next_ov->wsabuf.buf = next_ov->buffer;
+              next_ov->wsabuf.len = (ULONG)to_send;
+
+              DWORD sent = 0;
+              if (WSASend((SOCKET)conn->fd, &next_ov->wsabuf, 1, &sent, 0,
+                          &next_ov->overlapped, NULL) == SOCKET_ERROR) {
+                if (WSAGetLastError() != WSA_IO_PENDING) {
+                  free(next_ov);
+                  close_connection(ctx, (SOCKET)conn->fd);
+                }
+              }
+            } else {
+              close_connection(ctx, (SOCKET)conn->fd);
+            }
+          } else {
+            /* Completed sending all buffered data */
+            conn->out_buffer_pos = 0;
+            conn->out_buffer_len = 0;
+            if (conn->request_complete && conn->headers_sent) {
+              if (!conn->keep_alive) {
+                close_connection(ctx, (SOCKET)conn->fd);
+              } else {
+                reset_connection(conn);
+              }
+            }
           }
+        } else {
+          /* Error or connection closed */
+          close_connection(ctx, (SOCKET)conn->fd);
         }
         free(ov);
         break;
@@ -628,6 +671,20 @@ server_handle_t server_init(const server_config_t* config,
   return server;
 }
 
+static DWORD WINAPI accept_thread_func(LPVOID param) {
+  iocp_context_t* ctx = (iocp_context_t*)param;
+  while (ctx->running) {
+    SOCKET client = accept(ctx->listen_socket, NULL, NULL);
+    if (client != INVALID_SOCKET) {
+      iocp_overlapped_t* ov = &ctx->accept_ov;
+      ov->socket = client;
+      PostQueuedCompletionStatus(ctx->iocp, 0, 0, &ov->overlapped);
+    }
+    Sleep(1);
+  }
+  return 0;
+}
+
 int server_start(server_handle_t server) {
   iocp_context_t* ctx = &server->ctx;
 
@@ -639,15 +696,9 @@ int server_start(server_handle_t server) {
     ctx->worker_threads[i] = CreateThread(NULL, 0, worker_thread, ctx, 0, NULL);
   }
 
-  while (ctx->running) {
-    SOCKET client = accept(ctx->listen_socket, NULL, NULL);
-    if (client != INVALID_SOCKET) {
-      iocp_overlapped_t* ov = &ctx->accept_ov;
-      ov->socket = client;
-      PostQueuedCompletionStatus(ctx->iocp, 0, 0, &ov->overlapped);
-    }
-    Sleep(1);
-  }
+  /* Spawn accept loop in a dedicated background thread to prevent blocking V8
+   */
+  ctx->accept_thread = CreateThread(NULL, 0, accept_thread_func, ctx, 0, NULL);
 
   return 0;
 }
@@ -658,6 +709,21 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
   iocp_context_t* ctx = &server->ctx;
   ctx->running = false;
 
+  /* First close the listen socket so that the blocking accept() call in
+   * accept_thread exits */
+  if (ctx->listen_socket) {
+    closesocket(ctx->listen_socket);
+    ctx->listen_socket = INVALID_SOCKET;
+  }
+
+  /* Wait for and close accept thread */
+  if (ctx->accept_thread) {
+    WaitForSingleObject(ctx->accept_thread, INFINITE);
+    CloseHandle(ctx->accept_thread);
+    ctx->accept_thread = NULL;
+  }
+
+  /* Signal and wait for worker threads */
   for (int i = 0; i < WORKER_THREADS; i++) {
     if (ctx->worker_threads[i]) {
       PostQueuedCompletionStatus(ctx->iocp, 0, 0, NULL);
@@ -668,10 +734,6 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
 
   if (ctx->iocp) {
     CloseHandle(ctx->iocp);
-  }
-
-  if (ctx->listen_socket) {
-    closesocket(ctx->listen_socket);
   }
 
   if (ctx->connections) {
@@ -693,35 +755,76 @@ int server_send_response(server_handle_t server, connection_t* conn,
                          const response_t* response) {
   if (conn == NULL || response == NULL) return -1;
 
-  uint8_t buf[16384];
-  size_t len;
+  char head[4096];
+  size_t hlen = 0;
 
-  /* Use fast path for common case (no custom headers) */
-  if (response->header_count == 0) {
-    if (format_http_response_fast(response->status_code, response->body,
-                                  response->body_len, buf, sizeof(buf),
-                                  &len) < 0) {
-      return -1;
-    }
-  } else {
-    /* Robust header formatting */
-    const char* headers[128];
+  const char* status_text = "OK";
+  switch (response->status_code) {
+    case 200:
+      status_text = "OK";
+      break;
+    case 201:
+      status_text = "Created";
+      break;
+    case 400:
+      status_text = "Bad Request";
+      break;
+    case 404:
+      status_text = "Not Found";
+      break;
+    case 500:
+      status_text = "Internal Server Error";
+      break;
+  }
+
+  /* 1. Format status line */
+  int len = snprintf(head + hlen, sizeof(head) - hlen, "HTTP/1.1 %d %s\r\n",
+                     response->status_code, status_text);
+  if (len < 0) return -1;
+  hlen += len;
+
+  /* 2. Format custom headers */
+  if (response->headers) {
     size_t count = response->header_count;
     if (count > 64) count = 64;
-
-    for (size_t i = 0; i < count * 2; i++) {
-      headers[i] = response->headers[i];
-    }
-
-    if (format_http_response(response->status_code, headers, count,
-                             response->body, response->body_len, buf,
-                             sizeof(buf), &len) < 0) {
-      return -1;
+    for (size_t i = 0; i < count * 2 && response->headers[i]; i += 2) {
+      len = snprintf(head + hlen, sizeof(head) - hlen, "%s: %s\r\n",
+                     response->headers[i], response->headers[i + 1]);
+      if (len < 0) return -1;
+      hlen += len;
     }
   }
 
+  /* 3. Format Content-Length and blank line */
+  len = snprintf(head + hlen, sizeof(head) - hlen,
+                 "Content-Length: %zu\r\n\r\n", response->body_len);
+  if (len < 0) return -1;
+  hlen += len;
+
+  /* 4. Write headers */
+  if (server_write(server, conn, head, hlen) < 0) return -1;
+
+  /* 5. Write body if present */
+  if (response->body && response->body_len > 0) {
+    if (server_write(server, conn, response->body, response->body_len) < 0)
+      return -1;
+  }
+
   conn->headers_sent = true;
-  return server_write(server, conn, buf, len);
+
+  /* If all data has been sent immediately and keep_alive is false, close
+   * connection. Otherwise, if keep_alive is true and nothing is in out_buffer,
+   * reset. Note: server_write appends to out_buffer, so if out_buffer_len == 0
+   * it means it completed synchronously. */
+  if (conn->out_buffer_len == 0) {
+    if (!conn->keep_alive) {
+      close_connection(&server->ctx, (SOCKET)conn->fd);
+    } else {
+      reset_connection(conn);
+    }
+  }
+
+  return 0;
 }
 
 int server_write(server_handle_t server, connection_t* conn, const void* data,
@@ -812,8 +915,8 @@ int server_resume_read(server_handle_t server, connection_t* conn) {
   iocp_overlapped_t* ov = (iocp_overlapped_t*)conn->platform_sqe_data_recv;
   if (ov) {
     memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
-    ov->wsabuf.buf = ov->buffer;
-    ov->wsabuf.len = BUFFER_SIZE;
+    ov->wsabuf.buf = conn->buffer;
+    ov->wsabuf.len = (ULONG)conn->buffer_cap;
     DWORD received = 0;
     DWORD flags = 0;
     WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,

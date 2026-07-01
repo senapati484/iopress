@@ -5,7 +5,7 @@
  * Built on io_uring (Linux), kqueue (macOS), and IOCP (Windows).
  *
  * @module iopress
- * @version 1.0.4
+ * @version 1.0.5
  * @license ISC
  * @author senapati484
  *
@@ -80,6 +80,7 @@ if (process.env.IOPRESS_WORKER === '1') {
 function parseQuery(query) {
   const result = {};
   if (!query) return result;
+  const hasPercent = query.includes('%');
   let i = 0;
   while (i < query.length) {
     let eq = query.indexOf('=', i);
@@ -87,14 +88,17 @@ function parseQuery(query) {
     if (amp === -1) amp = query.length;
     if (eq === -1 || eq > amp) {
       if (i < amp) {
-        const key = decodeURIComponent(query.slice(i, amp));
+        const rawKey = query.slice(i, amp);
+        const key = hasPercent ? decodeURIComponent(rawKey) : rawKey;
         result[key] = result[key] ? [].concat(result[key], '') : '';
       }
       i = amp + 1; 
       continue; 
     }
-    const key = decodeURIComponent(query.slice(i, eq));
-    const val = decodeURIComponent(query.slice(eq + 1, amp));
+    const rawKey = query.slice(i, eq);
+    const rawVal = query.slice(eq + 1, amp);
+    const key = hasPercent ? decodeURIComponent(rawKey) : rawKey;
+    const val = hasPercent ? decodeURIComponent(rawVal) : rawVal;
     if (result[key] === undefined) {
       result[key] = val;
     } else if (Array.isArray(result[key])) {
@@ -819,23 +823,15 @@ class iopress {
    * @private
    * @since 1.0.0
    */
-  async _executeChain(req, res, handlers, index = 0) {
-    if (index >= handlers.length) {
-      // No more handlers - send 404 if response not sent
-      if (!res._sent) {
-        res.status(404).send('Not Found');
-      }
-      return;
-    }
+  _executeChain(req, res, handlers) {
+    let index = 0;
+    const self = this;
 
-    const handler = handlers[index];
-
-    // Create next function
-    const next = (err) => {
+    function next(err) {
       if (err) {
-        if (this.errorHandler) {
+        if (self.errorHandler) {
           try {
-            const result = this.errorHandler(err, req, res);
+            const result = self.errorHandler(err, req, res);
             if (result && typeof result.then === 'function') {
               result.catch(_e => {
                 if (!res._sent) res.status(500).send('Internal Server Error');
@@ -850,19 +846,25 @@ class iopress {
         return;
       }
 
-      // Continue to next handler
-      this._executeChain(req, res, handlers, index + 1);
-    };
-
-    try {
-      const result = handler(req, res, next);
-      if (result && typeof result.then === 'function') {
-        // Async handler - catch errors but do not await to avoid microtask queue overhead on success path
-        result.catch(next);
+      if (index >= handlers.length) {
+        if (!res._sent) {
+          res.status(404).send('Not Found');
+        }
+        return;
       }
-    } catch (err) {
-      next(err);
+
+      const handler = handlers[index++];
+      try {
+        const result = handler(req, res, next);
+        if (result && typeof result.then === 'function') {
+          result.catch(next);
+        }
+      } catch (err) {
+        next(err);
+      }
     }
+
+    next();
   }
 
   /**
@@ -928,6 +930,32 @@ class iopress {
 
     const self = this;
 
+    function matchMiddleware(mPath, routePath) {
+      if (mPath === '/') return true;
+      if (routePath === mPath) return true;
+      if (routePath.startsWith(mPath)) {
+        const nextChar = routePath[mPath.length];
+        return nextChar === '/' || mPath.endsWith('/');
+      }
+      return false;
+    }
+
+    /* Pre-compile chains for all routes to bypass dynamic allocations */
+    for (let r = 0; r < this.routes.length; r++) {
+      const route = this.routes[r];
+      const chain = [];
+      for (let i = 0; i < this.middleware.length; i++) {
+        const m = this.middleware[i];
+        if (matchMiddleware(m.path, route.path)) {
+          chain.push(m.handler);
+        }
+      }
+      for (let i = 0; i < route.handlers.length; i++) {
+        chain.push(route.handlers[i]);
+      }
+      route.chain = chain;
+    }
+
     const serverInfo = native.Listen(port, config, (nativeReq, nativeRes) => {
       const req = new Request(nativeReq);
       const res = new Response(nativeRes, native);
@@ -937,15 +965,19 @@ class iopress {
       if (match) {
         req.params = match.params;
 
-        const chain = [];
-        for (let i = 0; i < self.middleware.length; i++) {
-          const m = self.middleware[i];
-          if (req.path.startsWith(m.path) && !m.isTerminal) {
-            chain.push(m.handler);
+        let chain = match.route.chain;
+        if (!chain) {
+          chain = [];
+          for (let i = 0; i < self.middleware.length; i++) {
+            const m = self.middleware[i];
+            if (req.path.startsWith(m.path) && !m.isTerminal) {
+              chain.push(m.handler);
+            }
           }
-        }
-        for (let i = 0; i < match.route.handlers.length; i++) {
-          chain.push(match.route.handlers[i]);
+          for (let i = 0; i < match.route.handlers.length; i++) {
+            chain.push(match.route.handlers[i]);
+          }
+          match.route.chain = chain;
         }
 
         self._executeChain(req, res, chain);

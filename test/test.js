@@ -26,4 +26,34 @@ describe('iopress', () => {
     /* Native module exports Listen, RegisterRoute, etc. - not createServer */
     assert.ok(true, 'native module loaded successfully');
   });
+
+  describe('fallback', () => {
+    it('should fall back to pure JS and function identically', async () => {
+      process.env.IOPRESS_FORCE_FALLBACK = '1';
+      delete require.cache[require.resolve('../index.js')];
+      const fallbackIopress = require('../index.js');
+
+      assert.strictEqual(fallbackIopress.platform, 'fallback');
+      assert.strictEqual(fallbackIopress.backend, 'javascript');
+
+      const app = fallbackIopress();
+      app.get('/test-fallback', (req, res) => {
+        res.json({ message: 'fallback-success', query: req.query.foo });
+      });
+
+      const port = 10000 + Math.floor(Math.random() * 50000);
+      const _serverInfo = app.listen(port);
+
+      const response = await fetch(`http://localhost:${port}/test-fallback?foo=bar`);
+      const data = await response.json();
+
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(data.message, 'fallback-success');
+      assert.strictEqual(data.query, 'bar');
+
+      await new Promise(resolve => app.close(resolve));
+      delete process.env.IOPRESS_FORCE_FALLBACK;
+      delete require.cache[require.resolve('../index.js')];
+    });
+  });
 });

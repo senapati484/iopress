@@ -572,5 +572,5 @@ node benchmarks/run.js --compare
 
 ---
 
-*Architecture Version: 1.0.4*
+*Architecture Version: 1.0.5*
 *Last Updated: 2026-04-05*

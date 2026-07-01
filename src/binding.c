@@ -5,7 +5,7 @@
  * Handles thread-safe communication using napi_threadsafe_function.
  *
  * @file binding.c
- * @version 1.0.4
+ * @version 1.0.5
  */
 
 #include <node_api.h>
@@ -174,17 +174,35 @@ static int on_request_c_handler(connection_t* conn,
   }
 
   if (result->body_present && result->body_length > 0) {
-    req_data->body_len = result->body_length;
-    req_data->body = malloc(req_data->body_len);
-
-    /* Copy body from connection buffer */
     const uint8_t* body_ptr = NULL;
+    size_t available = 0;
+
+    if (result->chunked && !conn->assembled_body) {
+      conn->assembled_body = malloc(result->body_length);
+      if (conn->assembled_body) {
+        conn->assembled_body_len = (size_t)http_assemble_chunked_body(
+            conn->buffer, result, conn->assembled_body, result->body_length);
+      }
+    }
+
     if (conn->assembled_body) {
       body_ptr = conn->assembled_body;
+      available = conn->assembled_body_len;
     } else {
       body_ptr = conn->buffer + result->body_start;
+      if (conn->buffer_len > result->body_start) {
+        available = conn->buffer_len - result->body_start;
+        if (result->body_length < available) {
+          available = result->body_length;
+        }
+      }
     }
-    memcpy(req_data->body, body_ptr, req_data->body_len);
+
+    req_data->body_len = available;
+    req_data->body = malloc(available > 0 ? available : 1);
+    if (available > 0) {
+      memcpy(req_data->body, body_ptr, available);
+    }
   }
 
   /* 2. Dispatch to JS thread */
@@ -518,7 +536,7 @@ napi_value Init(napi_env env, napi_value exports) {
 
   /* Export version info */
   napi_value version;
-  napi_create_string_utf8(env, "1.0.4", NAPI_AUTO_LENGTH, &version);
+  napi_create_string_utf8(env, "1.0.5", NAPI_AUTO_LENGTH, &version);
   napi_set_named_property(env, exports, "version", version);
 
   napi_value platform;
