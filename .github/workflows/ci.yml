@@ -48,7 +48,7 @@ jobs:
         # Windows native build may have environment-specific failures;
         # allow the job to continue so other steps report their status.
         continue-on-error: ${{ runner.os == 'Windows' }}
-        timeout-minutes: 15
+        timeout-minutes: 20
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=1024"

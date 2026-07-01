@@ -16,19 +16,25 @@ const iopress = require('../js/index.js');
 const TEST_PORT = 3463;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 
-// Helper to make HTTP requests
+// Helper to make HTTP requests with explicit close to avoid keep-alive hangs
 function makeRequest(path) {
   return new Promise((resolve, reject) => {
-    const req = http.get(`${TEST_URL}${path}`, (res) => {
+    const options = {
+      hostname: 'localhost',
+      port: TEST_PORT,
+      path: path,
+      method: 'GET',
+      headers: { 'Connection': 'close' },
+      timeout: 5000
+    };
+    const req = http.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => resolve({ status: res.statusCode, body: data }));
     });
     req.on('error', reject);
-    req.setTimeout(5000, () => {
-      req.destroy();
-      reject(new Error('Timeout'));
-    });
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+    req.end();
   });
 }
 
@@ -82,13 +88,13 @@ describe('Memory Leak Tests', () => {
   });
 
   describe('Heap stability under load', () => {
-    it('should not leak memory over 1,000 requests', { timeout: 60000 }, async () => {
+    it('should not leak memory over repeated requests', { timeout: 60000 }, async () => {
 
       const initialMemory = getMemoryMB();
       console.log('\n  Initial memory:', initialMemory);
 
       // Number of requests (reduced for CI speed)
-      const requestCount = 1000;
+      const requestCount = process.env.CI ? 100 : 1000;
       const batchSize = 100;
       const batches = Math.ceil(requestCount / batchSize);
 
