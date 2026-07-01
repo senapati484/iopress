@@ -1123,11 +1123,27 @@ class iopress {
    * });
    */
   close(callback) {
-    // Call native close
+    // Close the server. Does NOT drain in-flight requests — see
+    // AUDIT.md item 2. For graceful shutdown, stop external traffic
+    // (LB, iptables) and wait for app.metrics().pending === 0 first.
     native.Close();
     if (callback) {
       callback();
     }
+    return native.Metrics();
+  }
+
+  /**
+   * Get a snapshot of production observability counters.
+   *
+   * Returns a plain object with: { pending, total, drops, errors }.
+   * Safe to call from any code path. Reads are non-blocking.
+   *
+   * @returns {{pending: number, total: number, drops: number, errors: number}}
+   * @since 1.1.0
+   */
+  metrics() {
+    return native.Metrics();
   }
 }
 

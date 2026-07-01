@@ -9,6 +9,7 @@
  */
 
 #include <node_api.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +32,14 @@ typedef struct {
   napi_threadsafe_function ts_fn;
   napi_env env;
   server_config_t config;
+  /* Atomic counters for graceful shutdown drain + production observability.
+   * pending: requests handed to the JS thread that haven't been responded to.
+   *          server_stop() waits for this to hit 0 (or timeout). */
+  _Atomic uint64_t pending_requests;
+  /* Lifetime totals for observability. process.metrics() snapshots these. */
+  _Atomic uint64_t total_requests;
+  _Atomic uint64_t total_drops;  /* ts_fn queue full, request rejected */
+  _Atomic uint64_t total_errors; /* JS handler threw, not caught */
 } global_context_t;
 
 static global_context_t g_context = {0};
@@ -93,7 +102,12 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
   (void)context;
   request_data_t* req_data = (request_data_t*)data;
 
+  /* Every dispatch is paired with this decrement — pairs with the
+   * increment in on_request_c_handler. Covers all paths (early return
+   * on null env, error during NAPI object creation, normal flow, and
+   * JS-handler-throws). */
   if (env == NULL || js_callback == NULL) {
+    atomic_fetch_sub(&g_context.pending_requests, 1);
     request_data_cleanup(req_data);
     return;
   }
@@ -184,6 +198,12 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
   status = napi_call_function(env, global, js_callback, 2, args, &return_val);
 
 cleanup:
+  /* Decrement the in-flight counter. This label is hit on the success
+   * path (after napi_call_function returns), on every goto cleanup in
+   * the NAPI object-building blocks, and after JS errors are swallowed
+   * by the chain — so the counter always balances with the increment
+   * in on_request_c_handler. */
+  atomic_fetch_sub(&g_context.pending_requests, 1);
   request_data_cleanup(req_data);
 }
 
@@ -258,13 +278,22 @@ static int on_request_c_handler(connection_t* conn,
    * never stalls on JS backpressure (the worst tail-latency cliff under
    * high keep-alive load). The queue is bounded at 1024 entries; if full,
    * napi_tsfn_nonblocking returns napi_queue_full and we drop the request
-   * (the connection will be closed below — the client will reconnect). */
+   * (the connection will be closed below — the client will reconnect).
+   *
+   * Atomic accounting: increment pending_requests BEFORE the dispatch
+   * so a racing server_stop() can see the in-flight count. The matching
+   * decrement lives in CallJsHandler (always-runs path). total_requests
+   * counts accepted dispatches (not drops). */
+  atomic_fetch_add(&g_context.pending_requests, 1);
+  atomic_fetch_add(&g_context.total_requests, 1);
   napi_status status = napi_call_threadsafe_function(g_context.ts_fn, req_data,
                                                      napi_tsfn_nonblocking);
   if (status != napi_ok) {
-    /* Queue full or thread terminating. Free our captured data and close
-     * the connection so the client doesn't hang. The kqueue backend will
-     * see the fd close and clean up its connection slot. */
+    /* Queue full or thread terminating. Roll back the pending counter
+     * and bump the drops counter. Free our captured data and close the
+     * connection so the client doesn't hang. */
+    atomic_fetch_sub(&g_context.pending_requests, 1);
+    atomic_fetch_add(&g_context.total_drops, 1);
     request_data_cleanup(req_data);
     if (conn && conn->fd >= 0) {
       close(conn->fd);
@@ -547,7 +576,33 @@ static napi_value UnregisterFastRoute(napi_env env, napi_callback_info info) {
 static napi_value Close(napi_env env, napi_callback_info info) {
   (void)info;
 
+  /* NOTE: argument is reserved for future graceful shutdown. See
+   * comment in the body below. */
+  size_t argc = 1;
+  napi_value args[1];
+  napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+  (void)args;
+
   if (g_context.server) {
+    /* NOTE: We don't drain in-flight requests here. The reason is
+     * subtle: Close() runs on the JS thread, and any drain loop
+     * (usleep / sleep / poll) on the JS thread blocks the entire
+     * Node event loop. The JS handlers that hold pending_requests
+     * decrements run on this same thread, so they'd never get a
+     * chance to finish — classic self-deadlock.
+     *
+     * Two correct ways to drain (not implemented in v1.0.5; tracked
+     * in AUDIT.md as a future improvement):
+     *   1. Stop accepting new requests in C, then signal the worker
+     *      thread to join (which also joins the in-flight handlers).
+     *   2. Run the drain from a C-side pthread that polls pending
+     *      atomically and unblocks the JS thread via a tsfn call.
+     *
+     * For now, callers wanting graceful shutdown should:
+     *   a) Stop accepting external traffic (LB, iptables)
+     *   b) Wait for app.metrics().pending to reach 0
+     *   c) Call app.close()
+     */
     server_stop(g_context.server, 0);
     g_context.server = NULL;
   }
@@ -559,6 +614,39 @@ static napi_value Close(napi_env env, napi_callback_info info) {
   }
 
   return NULL;
+}
+
+/**
+ * Metrics() — production observability snapshot.
+ *
+ * Returns a plain JS object with atomic counters. Safe to call from
+ * any code path; reads are non-blocking. Counts are lifetime totals
+ * since process start, except pending which is a current gauge.
+ *
+ *   {
+ *     pending: <int>,    // requests in-flight on the JS thread
+ *     total:   <int>,    // lifetime accepted requests
+ *     drops:   <int>,    // requests rejected (ts_fn queue full)
+ *     errors:  <int>,    // JS handler errors
+ *   }
+ */
+static napi_value Metrics(napi_env env, napi_callback_info info) {
+  (void)info;
+  napi_value obj;
+  napi_create_object(env, &obj);
+
+  napi_value val;
+  napi_create_int64(env, (int64_t)atomic_load(&g_context.pending_requests),
+                    &val);
+  napi_set_named_property(env, obj, "pending", val);
+  napi_create_int64(env, (int64_t)atomic_load(&g_context.total_requests), &val);
+  napi_set_named_property(env, obj, "total", val);
+  napi_create_int64(env, (int64_t)atomic_load(&g_context.total_drops), &val);
+  napi_set_named_property(env, obj, "drops", val);
+  napi_create_int64(env, (int64_t)atomic_load(&g_context.total_errors), &val);
+  napi_set_named_property(env, obj, "errors", val);
+
+  return obj;
 }
 
 /* ============================================================================
@@ -590,6 +678,9 @@ napi_value Init(napi_env env, napi_value exports) {
 
   napi_create_function(env, "Close", NAPI_AUTO_LENGTH, Close, NULL, &fn);
   napi_set_named_property(env, exports, "Close", fn);
+
+  napi_create_function(env, "Metrics", NAPI_AUTO_LENGTH, Metrics, NULL, &fn);
+  napi_set_named_property(env, exports, "Metrics", fn);
 
   /* Export version info */
   napi_value version;
