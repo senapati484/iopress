@@ -48,6 +48,9 @@ typedef struct {
   char* query;
   uint8_t* body;
   size_t body_len;
+  /* When true, `body` is owned by a V8 external Buffer; the external
+   * finalize callback will free it. request_data_cleanup must NOT free it. */
+  bool body_owned_by_v8;
 } request_data_t;
 
 /* ============================================================================
@@ -63,8 +66,23 @@ static void request_data_cleanup(request_data_t* data) {
   if (data->method) free(data->method);
   if (data->path) free(data->path);
   if (data->query) free(data->query);
-  if (data->body) free(data->body);
+  /* Only free body if V8 did not take ownership via external buffer. */
+  if (data->body && !data->body_owned_by_v8) free(data->body);
   free(data);
+}
+
+/**
+ * Finalize callback for the request body external buffer.
+ *
+ * V8 calls this when the JS-side Buffer that wraps our request body is
+ * garbage-collected. We free the underlying C allocation here so the
+ * body does not need to be copied on the way into V8 (zero-copy path).
+ */
+static void request_body_external_finalize(napi_env env, void* data,
+                                           void* hint) {
+  (void)env;
+  (void)hint;
+  if (data) free(data);
 }
 
 /**
@@ -108,13 +126,20 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
   napi_set_named_property(env, req_obj, "fd", val);
 
   if (req_data->body_len > 0) {
-    void* buffer_data;
     napi_value body_buf;
-    status =
-        napi_create_buffer(env, req_data->body_len, &buffer_data, &body_buf);
+    /* Zero-copy: hand V8 the malloc'd body directly. The external finalize
+     * callback (request_body_external_finalize) will free() it when the JS
+     * Buffer is GC'd. Mark the body as V8-owned so request_data_cleanup
+     * does NOT double-free it. */
+    status = napi_create_external_buffer(
+        env, req_data->body_len, req_data->body, request_body_external_finalize,
+        NULL, &body_buf);
     if (status == napi_ok) {
-      memcpy(buffer_data, req_data->body, req_data->body_len);
+      req_data->body_owned_by_v8 = true;
       napi_set_named_property(env, req_obj, "body", body_buf);
+    } else {
+      napi_get_null(env, &val);
+      napi_set_named_property(env, req_obj, "body", val);
     }
   } else {
     napi_get_null(env, &val);
