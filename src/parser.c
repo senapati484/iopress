@@ -248,12 +248,18 @@ int http_parse_request(const uint8_t* buffer, size_t len,
   result->path = path_start;
   result->path_len = path_end - path_start;
 
-  /* Check for query string */
-  const char* query_start = memchr(path_start, '?', result->path_len);
-  if (query_start != NULL) {
-    result->query = query_start + 1;
-    result->query_len = path_end - result->query;
-    result->path_len = query_start - path_start;
+  /* Check for query string.
+   * A '?' requires at least one character before it, so for a 1-byte
+   * path (the common hello-world "/") skip the memchr entirely. The
+   * result->query / result->query_len are pre-zeroed by the memset
+   * at the top of this function, so leaving them NULL is correct. */
+  if (result->path_len >= 2) {
+    const char* query_start = memchr(result->path, '?', result->path_len);
+    if (query_start != NULL) {
+      result->query = query_start + 1;
+      result->query_len = path_end - result->query;
+      result->path_len = query_start - result->path;
+    }
   }
 
   /* Move to HTTP version or end of line */
