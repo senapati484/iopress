@@ -146,6 +146,30 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
     napi_set_named_property(env, req_obj, "body", val);
   }
 
+  /* 1b. Build headers object. Parser already extracted and lower-cased
+   * them into req_data->result.header_names / header_values (zero-copy,
+   * points into the request buffer). We allocate one JS object and set
+   * each (name, value) pair as a property. */
+  {
+    napi_value headers_obj;
+    status = napi_create_object(env, &headers_obj);
+    if (status != napi_ok) goto cleanup;
+    napi_value hname, hval;
+    for (size_t i = 0; i < req_data->result.header_count; i++) {
+      status =
+          napi_create_string_utf8(env, req_data->result.header_names[i],
+                                  req_data->result.header_name_lens[i], &hname);
+      if (status != napi_ok) goto cleanup;
+      status =
+          napi_create_string_utf8(env, req_data->result.header_values[i],
+                                  req_data->result.header_value_lens[i], &hval);
+      if (status != napi_ok) goto cleanup;
+      status = napi_set_property(env, headers_obj, hname, hval);
+      if (status != napi_ok) goto cleanup;
+    }
+    napi_set_named_property(env, req_obj, "headers", headers_obj);
+  }
+
   /* 2. Create Response object */
   napi_value res_obj;
   status = napi_create_object(env, &res_obj);

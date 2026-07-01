@@ -317,6 +317,65 @@ int http_parse_request(const uint8_t* buffer, size_t len,
     return PARSE_STATUS_NEED_MORE;
   }
 
+  /* =========================================================================
+   * Step 2.5: Extract headers. We have headers_start..headers_end; walk
+   * each line, split on first ':' into name + value, lower-case the name,
+   * trim leading whitespace from value, and append to result arrays. The
+   * pointers stay into the request buffer (zero-copy). Done before the
+   * body-length check so binding.c can hand the JS layer a populated
+   * req.headers on the slow path.
+   * =========================================================================
+   */
+  {
+    const char* hp = headers_start;
+    while (hp < headers_end && result->header_count < MAX_HEADERS) {
+      const char* line_end = memchr(hp, '\n', headers_end - hp);
+      if (!line_end) break;
+      const char* name = hp;
+      const char* name_end = name;
+      /* Walk to ':' or end-of-line. */
+      while (name_end < line_end && *name_end != ':' && *name_end != '\r') {
+        name_end++;
+      }
+      if (name_end == name || name_end >= line_end || *name_end != ':') {
+        /* Malformed line (no colon, or empty name) — skip it. RFC 7230
+         * says we should reject the request, but defensive parsing is
+         * more useful for a high-perf server. */
+        hp = line_end + 1;
+        continue;
+      }
+      const char* val = name_end + 1;
+      /* Trim leading whitespace and CR. */
+      while (val < line_end && (*val == ' ' || *val == '\t')) val++;
+      const char* val_end = line_end;
+      if (val_end > val && *(val_end - 1) == '\r') val_end--;
+      size_t name_len = (size_t)(name_end - name);
+      if (name_len == 0 || name_len > MAX_HEADER_LINE) {
+        hp = line_end + 1;
+        continue;
+      }
+      /* Reject if a single header line is absurdly long. */
+      if ((size_t)(line_end - name) > MAX_HEADER_LINE) {
+        result->status = PARSE_STATUS_ERROR;
+        result->error_code = ERROR_HEADER_TOO_LARGE;
+        return result->status;
+      }
+      /* Lowercase the name in place. The buffer is mutable from the
+       * server's perspective (it's the read buffer), so this is safe
+       * and avoids a copy. */
+      for (size_t i = 0; i < name_len; i++) {
+        const char c = name[i];
+        if (c >= 'A' && c <= 'Z') ((char*)name)[i] = (char)(c + ('a' - 'A'));
+      }
+      result->header_names[result->header_count] = name;
+      result->header_name_lens[result->header_count] = name_len;
+      result->header_values[result->header_count] = val;
+      result->header_value_lens[result->header_count] = (size_t)(val_end - val);
+      result->header_count++;
+      hp = line_end + 1;
+    }
+  }
+
   result->headers_complete = true;
   result->body_start = headers_end - (const char*)buf;
 

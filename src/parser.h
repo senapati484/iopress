@@ -16,6 +16,13 @@
 
 #define MAX_HEADER_SIZE 32768
 
+/* Hard cap on header count per request. RFC 7230 doesn't mandate a
+ * limit, but 128 is more than any reasonable client needs and protects
+ * the parser from a hostile request with thousands of headers. */
+#define MAX_HEADERS 128
+/* Per-header name+value length cap. Same rationale. */
+#define MAX_HEADER_LINE 8192
+
 typedef struct parse_result_s {
   int status;
   int error_code;
@@ -33,6 +40,16 @@ typedef struct parse_result_s {
   size_t body_length;
   size_t bytes_consumed;
   bool chunked;
+  /* Parsed headers: arrays of name/value pointers and lengths, parallel.
+   * All point into the request buffer (zero-copy). header_count entries.
+   * Lowercased on parse so consumers can do case-insensitive lookup with
+   * a single string compare. Valid only when status == PARSE_STATUS_DONE
+   * for the request that finishes header parsing. */
+  const char* header_names[MAX_HEADERS];
+  size_t header_name_lens[MAX_HEADERS];
+  const char* header_values[MAX_HEADERS];
+  size_t header_value_lens[MAX_HEADERS];
+  size_t header_count;
 } parse_result_t;
 
 #ifdef __cplusplus
