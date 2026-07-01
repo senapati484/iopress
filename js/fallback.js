@@ -11,6 +11,15 @@
 
 const http = require('http');
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 function parseQuery(query) {
   const result = {};
   if (!query) return result;
@@ -127,10 +136,18 @@ class Response {
       return this;
     }
 
-    const bodyStr = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
-
     if (!this.get('content-type')) {
       this.set('Content-Type', 'text/plain; charset=utf-8');
+    }
+
+    this.set('X-Content-Type-Options', 'nosniff');
+
+    let bodyStr;
+    if (Buffer.isBuffer(data)) {
+      bodyStr = data;
+    } else {
+      const str = String(data);
+      bodyStr = Buffer.from(this._shouldEscape() ? escapeHtml(str) : str, 'utf8');
     }
 
     /* Write headers to Node response */
@@ -142,6 +159,18 @@ class Response {
     this._nodeRes.end(bodyStr);
     this._sent = true;
     return this;
+  }
+
+  _shouldEscape() {
+    const ct = this.get('content-type');
+    if (!ct) return true;
+    const lower = ct.toLowerCase();
+    if (lower.startsWith('image/') || lower.startsWith('video/') ||
+        lower.startsWith('audio/') || lower === 'application/json' ||
+        lower.includes('octet-stream') || lower.startsWith('multipart/')) {
+      return false;
+    }
+    return true;
   }
 
   end(data) {
