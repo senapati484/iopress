@@ -17,21 +17,21 @@
 #endif
 
 /* Platform atomic operations.
- * GCC/Clang: __atomic builtins (since GCC 4.7, Clang 3.1).
- * MSVC: _InterlockedExchangeAdd64 (available on x64, no C11 required). */
+ * GCC/Clang: <stdatomic.h> C11 atomics.
+ * MSVC: _InterlockedExchangeAdd64 intrinsic (no C11 required). */
 #if defined(_MSC_VER)
 #include <intrin.h>
 #pragma intrinsic(_InterlockedExchangeAdd64)
 typedef volatile long long atomic_u64;
-#define atomic_inc(p) _InterlockedExchangeAdd64(p, 1)
-#define atomic_dec(p) _InterlockedExchangeAdd64(p, -1)
-#define atomic_read(p) _InterlockedExchangeAdd64(p, 0)
+#define ATOMIC_INC(p) _InterlockedExchangeAdd64(p, 1)
+#define ATOMIC_DEC(p) _InterlockedExchangeAdd64(p, -1)
+#define ATOMIC_READ(p) _InterlockedExchangeAdd64(p, 0)
 #else
 #include <stdatomic.h>
 typedef _Atomic uint64_t atomic_u64;
-#define atomic_inc(p) atomic_fetch_add(p, 1)
-#define atomic_dec(p) atomic_fetch_sub(p, 1)
-#define atomic_read(p) atomic_load(p)
+#define ATOMIC_INC(p) atomic_fetch_add(p, 1)
+#define ATOMIC_DEC(p) atomic_fetch_sub(p, 1)
+#define ATOMIC_READ(p) atomic_load(p)
 #endif
 
 #include "fast_router.h"
@@ -124,7 +124,7 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
    * on null env, error during NAPI object creation, normal flow, and
    * JS-handler-throws). */
   if (env == NULL || js_callback == NULL) {
-    atomic_fetch_sub(&g_context.pending_requests, 1);
+    ATOMIC_DEC(&g_context.pending_requests);
     request_data_cleanup(req_data);
     return;
   }
@@ -223,7 +223,7 @@ cleanup:
    * the NAPI object-building blocks, and after JS errors are swallowed
    * by the chain — so the counter always balances with the increment
    * in on_request_c_handler. */
-  atomic_fetch_sub(&g_context.pending_requests, 1);
+  ATOMIC_DEC(&g_context.pending_requests);
   request_data_cleanup(req_data);
 }
 
@@ -305,13 +305,13 @@ static int on_request_c_handler(connection_t* conn,
   }
 
   /* 2. Dispatch to JS thread */
-  atomic_fetch_add(&g_context.pending_requests, 1);
-  atomic_fetch_add(&g_context.total_requests, 1);
+  ATOMIC_INC(&g_context.pending_requests);
+  ATOMIC_INC(&g_context.total_requests);
   napi_status status = napi_call_threadsafe_function(g_context.ts_fn, req_data,
                                                      napi_tsfn_blocking);
   if (status != napi_ok) {
-    atomic_fetch_sub(&g_context.pending_requests, 1);
-    atomic_fetch_add(&g_context.total_drops, 1);
+    ATOMIC_DEC(&g_context.pending_requests);
+    ATOMIC_INC(&g_context.total_drops);
     request_data_cleanup(req_data);
   }
 
@@ -656,14 +656,14 @@ static napi_value Metrics(napi_env env, napi_callback_info info) {
   napi_create_object(env, &obj);
 
   napi_value val;
-  napi_create_int64(env, (int64_t)atomic_read(&g_context.pending_requests),
+  napi_create_int64(env, (int64_t)ATOMIC_READ(&g_context.pending_requests),
                     &val);
   napi_set_named_property(env, obj, "pending", val);
-  napi_create_int64(env, (int64_t)atomic_read(&g_context.total_requests), &val);
+  napi_create_int64(env, (int64_t)ATOMIC_READ(&g_context.total_requests), &val);
   napi_set_named_property(env, obj, "total", val);
-  napi_create_int64(env, (int64_t)atomic_read(&g_context.total_drops), &val);
+  napi_create_int64(env, (int64_t)ATOMIC_READ(&g_context.total_drops), &val);
   napi_set_named_property(env, obj, "drops", val);
-  napi_create_int64(env, (int64_t)atomic_read(&g_context.total_errors), &val);
+  napi_create_int64(env, (int64_t)ATOMIC_READ(&g_context.total_errors), &val);
   napi_set_named_property(env, obj, "errors", val);
 
   return obj;
@@ -678,7 +678,7 @@ static napi_value Metrics(napi_env env, napi_callback_info info) {
 static napi_value BumpError(napi_env env, napi_callback_info info) {
   (void)env;
   (void)info;
-  atomic_fetch_add(&g_context.total_errors, 1);
+  ATOMIC_INC(&g_context.total_errors);
   return NULL;
 }
 
