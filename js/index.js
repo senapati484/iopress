@@ -372,11 +372,19 @@ class Response {
       this.set('Content-Type', 'text/plain; charset=utf-8');
     }
 
+    /* Flatten the headers object into a [name, value, name, value, ...]
+     * array. Avoids the binding's napi_get_all_property_names + per-key
+     * napi_get_property walk on every response. */
+    const headerList = [];
+    for (const k in this.headers) {
+      headerList.push(k, this.headers[k]);
+    }
+
     this._binding.SendResponse(
       this._fd,
       this.statusCode,
       bodyStr,
-      this.headers
+      headerList
     );
 
     this._sent = true;

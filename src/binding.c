@@ -408,15 +408,17 @@ static napi_value SendResponse(napi_env env, napi_callback_info info) {
     }
   }
 
-  /* 2. Parse headers object (args[3]) */
-  napi_value headers_obj = args[3];
-  napi_value prop_names;
-  napi_get_all_property_names(env, headers_obj, napi_key_own_only,
-                              napi_key_writable, napi_key_numbers_to_strings,
-                              &prop_names);
-
+  /* 2. Parse headers flat array (args[3])
+   *
+   * Format: [name0, value0, name1, value1, ...] — built by the JS layer
+   * in Response.send(). Replaces the old object-walk that did one
+   * napi_get_all_property_names + N napi_get_property calls per response.
+   * The array path is one napi_get_array_length + 2*n napi_get_element
+   * calls — no V8 object walk, no hidden-class walk. The flat array also
+   * means the names and values land in the same order on both sides, so
+   * we don't need to re-pair them in C. */
   uint32_t header_count = 0;
-  napi_get_array_length(env, prop_names, &header_count);
+  napi_get_array_length(env, args[3], &header_count);
 
   const char* headers[256];
   char* header_strings[256];
@@ -424,27 +426,15 @@ static napi_value SendResponse(napi_env env, napi_callback_info info) {
   uint32_t k = 0;
 
   for (uint32_t i = 0; i < header_count && k < 254; i++) {
-    napi_value key_val;
-    napi_get_element(env, prop_names, i, &key_val);
+    napi_value val;
+    napi_get_element(env, args[3], i, &val);
 
-    napi_value val_val;
-    napi_get_property(env, headers_obj, key_val, &val_val);
-
-    size_t key_len, val_len;
-    napi_get_value_string_utf8(env, key_val, NULL, 0, &key_len);
-    header_strings[k] = malloc(key_len + 1);
-    napi_get_value_string_utf8(env, key_val, header_strings[k], key_len + 1,
-                               &key_len);
+    size_t vlen;
+    napi_get_value_string_utf8(env, val, NULL, 0, &vlen);
+    header_strings[k] = malloc(vlen + 1);
+    napi_get_value_string_utf8(env, val, header_strings[k], vlen + 1, &vlen);
     headers[k] = header_strings[k];
-    header_lens[k] = key_len;
-    k++;
-
-    napi_get_value_string_utf8(env, val_val, NULL, 0, &val_len);
-    header_strings[k] = malloc(val_len + 1);
-    napi_get_value_string_utf8(env, val_val, header_strings[k], val_len + 1,
-                               &val_len);
-    headers[k] = header_strings[k];
-    header_lens[k] = val_len;
+    header_lens[k] = vlen;
     k++;
   }
 
