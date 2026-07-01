@@ -353,7 +353,7 @@ describe('iopress Integration Tests', () => {
 
     it('should expose platform', () => {
       assert.strictEqual(typeof iopress.platform, 'string');
-      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'unknown'].includes(iopress.platform));
+      assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'io_uring', 'unknown'].includes(iopress.platform));
     });
   });
 });

@@ -9,7 +9,7 @@ describe('iopress', () => {
 
   it('should export platform', () => {
     assert.strictEqual(typeof iopress.platform, 'string');
-    assert.ok(['linux', 'mac', 'kqueue', 'windows', 'unknown'].includes(iopress.platform));
+    assert.ok(['linux', 'mac', 'kqueue', 'windows', 'libuv', 'io_uring', 'unknown'].includes(iopress.platform));
   });
 
   it('should export version in semver format', () => {

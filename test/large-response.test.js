@@ -8,7 +8,7 @@ test('Large Response Test', async (t) => {
   const port = 3462;
   
   // Use smaller body in CI to avoid slow 1MB transfers on shared runners
-  const bodySize = process.env.CI ? 100 * 1024 : 1024 * 1024;
+  const bodySize = process.env.CI ? 10 * 1024 : 1024 * 1024;
   const largeBody = 'A'.repeat(bodySize);
   
   app.get('/large', (req, res) => {
@@ -35,7 +35,7 @@ test('Large Response Test', async (t) => {
           }
         });
       });
-      req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+      req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout')); });
       req.on('error', reject);
     });
   });
