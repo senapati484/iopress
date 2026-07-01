@@ -847,6 +847,10 @@ class iopress {
 
     function next(err) {
       if (err) {
+        /* Bump the errors counter. Cheap (atomic_add on a cache line
+         * not shared with the hot path) and lets production observe
+         * error rates via app.metrics().errors. */
+        if (native.BumpError) native.BumpError();
         if (self.errorHandler) {
           try {
             const result = self.errorHandler(err, req, res);

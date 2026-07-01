@@ -649,6 +649,19 @@ static napi_value Metrics(napi_env env, napi_callback_info info) {
   return obj;
 }
 
+/**
+ * BumpError() — atomically increment the total_errors counter.
+ *
+ * Called from JS when a request handler throws an uncaught error
+ * (caught by the _executeChain error boundary). Cheap, no-arg.
+ */
+static napi_value BumpError(napi_env env, napi_callback_info info) {
+  (void)env;
+  (void)info;
+  atomic_fetch_add(&g_context.total_errors, 1);
+  return NULL;
+}
+
 /* ============================================================================
  * Module Initialization
  * ============================================================================
@@ -681,6 +694,10 @@ napi_value Init(napi_env env, napi_value exports) {
 
   napi_create_function(env, "Metrics", NAPI_AUTO_LENGTH, Metrics, NULL, &fn);
   napi_set_named_property(env, exports, "Metrics", fn);
+
+  napi_create_function(env, "BumpError", NAPI_AUTO_LENGTH, BumpError, NULL,
+                       &fn);
+  napi_set_named_property(env, exports, "BumpError", fn);
 
   /* Export version info */
   napi_value version;
