@@ -9,12 +9,29 @@
  */
 
 #include <node_api.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
 #include <unistd.h>
+#endif
+
+/* Platform atomic operations.
+ * GCC/Clang: __atomic builtins (since GCC 4.7, Clang 3.1).
+ * MSVC: _InterlockedExchangeAdd64 (available on x64, no C11 required). */
+#if defined(_MSC_VER)
+#include <intrin.h>
+#pragma intrinsic(_InterlockedExchangeAdd64)
+typedef volatile long long atomic_u64;
+#define atomic_inc(p) _InterlockedExchangeAdd64(p, 1)
+#define atomic_dec(p) _InterlockedExchangeAdd64(p, -1)
+#define atomic_read(p) _InterlockedExchangeAdd64(p, 0)
+#else
+#include <stdatomic.h>
+typedef _Atomic uint64_t atomic_u64;
+#define atomic_inc(p) atomic_fetch_add(p, 1)
+#define atomic_dec(p) atomic_fetch_sub(p, 1)
+#define atomic_read(p) atomic_load(p)
 #endif
 
 #include "fast_router.h"
@@ -35,11 +52,11 @@ typedef struct {
   /* Atomic counters for graceful shutdown drain + production observability.
    * pending: requests handed to the JS thread that haven't been responded to.
    *          server_stop() waits for this to hit 0 (or timeout). */
-  _Atomic uint64_t pending_requests;
+  atomic_u64 pending_requests;
   /* Lifetime totals for observability. process.metrics() snapshots these. */
-  _Atomic uint64_t total_requests;
-  _Atomic uint64_t total_drops;  /* ts_fn queue full, request rejected */
-  _Atomic uint64_t total_errors; /* JS handler threw, not caught */
+  atomic_u64 total_requests;
+  atomic_u64 total_drops;  /* ts_fn queue full, request rejected */
+  atomic_u64 total_errors; /* JS handler threw, not caught */
 } global_context_t;
 
 static global_context_t g_context = {0};
@@ -639,14 +656,14 @@ static napi_value Metrics(napi_env env, napi_callback_info info) {
   napi_create_object(env, &obj);
 
   napi_value val;
-  napi_create_int64(env, (int64_t)atomic_load(&g_context.pending_requests),
+  napi_create_int64(env, (int64_t)atomic_read(&g_context.pending_requests),
                     &val);
   napi_set_named_property(env, obj, "pending", val);
-  napi_create_int64(env, (int64_t)atomic_load(&g_context.total_requests), &val);
+  napi_create_int64(env, (int64_t)atomic_read(&g_context.total_requests), &val);
   napi_set_named_property(env, obj, "total", val);
-  napi_create_int64(env, (int64_t)atomic_load(&g_context.total_drops), &val);
+  napi_create_int64(env, (int64_t)atomic_read(&g_context.total_drops), &val);
   napi_set_named_property(env, obj, "drops", val);
-  napi_create_int64(env, (int64_t)atomic_load(&g_context.total_errors), &val);
+  napi_create_int64(env, (int64_t)atomic_read(&g_context.total_errors), &val);
   napi_set_named_property(env, obj, "errors", val);
 
   return obj;
