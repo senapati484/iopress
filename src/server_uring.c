@@ -824,9 +824,19 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
   uring_context_t* ctx = &server->ctx;
   ctx->running = false;
 
-  io_uring_queue_exit(&ctx->ring);
+  /* Submit a NOP to wake the event loop out of io_uring_wait_cqe().
+   * io_uring_queue_exit() does NOT unblock a waiting thread on all
+   * kernel versions, so we must send a dummy completion first. */
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ctx->ring);
+  if (sqe) {
+    io_uring_prep_nop(sqe);
+    io_uring_sqe_set_data(sqe, NULL);
+    io_uring_submit(&ctx->ring);
+  }
 
   pthread_join(ctx->event_thread, NULL);
+
+  io_uring_queue_exit(&ctx->ring);
 
   for (size_t i = 0; i < ctx->max_connections; i++) {
     if (ctx->connections[i].fd >= 0) {
