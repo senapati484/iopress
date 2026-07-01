@@ -30,6 +30,9 @@ const os = require('os');
 const { spawn } = require('child_process');
 
 function escapeHtml(str) {
+  if (str.indexOf('&') === -1 && str.indexOf('<') === -1 &&
+      str.indexOf('>') === -1 && str.indexOf('"') === -1 &&
+      str.indexOf('\'') === -1) return str;
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -382,13 +385,8 @@ class Response {
 
     this.set('X-Content-Type-Options', 'nosniff');
 
-    let bodyStr;
-    if (Buffer.isBuffer(data)) {
-      bodyStr = data.toString('utf8');
-    } else {
-      const str = String(data);
-      bodyStr = this._shouldEscape() ? escapeHtml(str) : str;
-    }
+    const isJson = this.get('content-type') === 'application/json';
+    const bodyStr = Buffer.isBuffer(data) ? data.toString('utf8') : isJson ? String(data) : escapeHtml(String(data));
     this._cachedBody = bodyStr;
 
     this._binding.SendResponse(
@@ -400,18 +398,6 @@ class Response {
 
     this._sent = true;
     return this;
-  }
-
-  _shouldEscape() {
-    const ct = this.get('content-type');
-    if (!ct) return true;
-    const lower = ct.toLowerCase();
-    if (lower.startsWith('image/') || lower.startsWith('video/') ||
-        lower.startsWith('audio/') || lower === 'application/json' ||
-        lower.includes('octet-stream') || lower.startsWith('multipart/')) {
-      return false;
-    }
-    return true;
   }
 
   /**

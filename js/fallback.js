@@ -12,6 +12,9 @@
 const http = require('http');
 
 function escapeHtml(str) {
+  if (str.indexOf('&') === -1 && str.indexOf('<') === -1 &&
+      str.indexOf('>') === -1 && str.indexOf('"') === -1 &&
+      str.indexOf('\'') === -1) return str;
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -142,13 +145,8 @@ class Response {
 
     this.set('X-Content-Type-Options', 'nosniff');
 
-    let bodyStr;
-    if (Buffer.isBuffer(data)) {
-      bodyStr = data;
-    } else {
-      const str = String(data);
-      bodyStr = Buffer.from(this._shouldEscape() ? escapeHtml(str) : str, 'utf8');
-    }
+    const isJson = this.get('content-type') === 'application/json';
+    const bodyStr = Buffer.isBuffer(data) ? data : Buffer.from(isJson ? String(data) : escapeHtml(String(data)), 'utf8');
 
     /* Write headers to Node response */
     this._nodeRes.statusCode = this.statusCode;
@@ -159,18 +157,6 @@ class Response {
     this._nodeRes.end(bodyStr);
     this._sent = true;
     return this;
-  }
-
-  _shouldEscape() {
-    const ct = this.get('content-type');
-    if (!ct) return true;
-    const lower = ct.toLowerCase();
-    if (lower.startsWith('image/') || lower.startsWith('video/') ||
-        lower.startsWith('audio/') || lower === 'application/json' ||
-        lower.includes('octet-stream') || lower.startsWith('multipart/')) {
-      return false;
-    }
-    return true;
   }
 
   end(data) {
