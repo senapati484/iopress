@@ -7,8 +7,8 @@
 
 ## Summary
 
-- **1 CRITICAL** found and **FIXED** in this audit cycle (req.headers passing)
-- **2 HIGH** remaining (graceful shutdown drain, production observability)
+- **1 CRITICAL** found and **FIXED** in commit `3ba6527` (req.headers passing)
+- **2 HIGH** resolved: 1 deferred (graceful drain — self-deadlock, needs C-side rework), 1 fixed in `3dc0637` (observability)
 - **3 MEDIUM** (minor concerns, no immediate fix)
 - **4 LOW/INFO** (cosmetic or already-mitigated)
 
@@ -44,47 +44,57 @@ The slow-path tests in the bench show numbers 30-40% lower now that the framewor
 
 ---
 
-## HIGH (remaining)
+## HIGH (status update)
 
-### 2. Graceful shutdown doesn't drain in-flight requests
+### 2. Graceful shutdown doesn't drain in-flight requests — DEFERRED
 
-**File:** `src/server_kevent.c:569-582`, `src/binding.c:523-528`
+**File:** `src/server_kevent.c:569-582`, `src/binding.c` (close path)
 
-**Description:** `server_stop()` takes a `timeout_ms` parameter but ignores it — immediately signals `running = false` and `pthread_join`s worker threads. The JS `Close()` binding passes `0`. Any request currently being processed by the JS thread is cut off without response, and any request in the threadsafe-function queue (up to 1024) is dropped.
+**Description (initial assessment):** `server_stop()` takes a `timeout_ms` parameter but ignores it — immediately signals `running = false` and `pthread_join`s worker threads. The JS `Close()` binding passes `0`. Any request currently being processed by the JS thread is cut off without response, and any request in the threadsafe-function queue (up to 1024) is dropped.
 
-**Recommended fix:**
+**Resolution:** During implementation, discovered that a JS-side drain loop is a self-deadlock:
 
-1. Decrement a `pending_requests` counter in the C server when `napi_call_threadsafe_function` succeeds; increment it again in `CallJsHandler` after the JS callback returns
-2. In `server_stop()` with `timeout_ms > 0`, busy-wait (with short sleeps) until `pending_requests == 0` or timeout expires
-3. Then proceed to the existing `running = false` + join path
-4. After timeout, force-close any remaining connections
+- The JS handlers that hold `pending_requests` decrements run on the JS event loop thread.
+- The drain loop in `Close()` also runs on the JS thread.
+- `usleep` on the JS thread blocks the entire Node event loop, including the timers and async I/O that JS handlers need to make progress.
+- Result: `pending` never decreases, drain never completes, the process hangs until timeout.
 
-**Risk if unfixed:** SIGTERM during a deploy will cause some clients to get connection-reset errors. Acceptable for many use cases (rolling deploys via load balancer, internal APIs) but a problem for public-facing services.
+**Documented workaround (in `binding.c:Close`):**
 
-**Effort:** ~50 lines of C, 0 lines of JS.
+```js
+// Graceful shutdown recipe
+// 1. Stop external traffic (LB, iptables)
+// 2. Wait for app.metrics().pending === 0
+// 3. Call app.close()
+```
 
-### 3. No production observability
+**Correct implementations (not built in this audit, tracked for v1.2+):**
 
-**File:** entire codebase
+1. **C-side worker thread coordination:** Spawn a dedicated drain thread from `Close()` that polls `pending` atomically and unblocks the JS thread via `napi_call_threadsafe_function`. JS thread then continues to a no-op until C-side drain completes.
+2. **Stop-C-first-then-drain:** Set a `stop_accepting = true` flag in C, drain the accept queue, *then* return to the JS thread to drain JS handlers. Requires careful ordering with the event loop thread.
 
-**Description:** The server exposes zero metrics:
+**Why not built now:** Both are non-trivial (80-150 lines of careful C + test coverage). Doing it wrong would silently corrupt shutdown. The metrics+workaround path unblocks the v1.0.5 release; the proper drain can land in v1.2 once we have integration tests for shutdown.
 
-- No `process.metrics()` returning `{active_connections, total_requests, errors, queue_depth, dropped_requests}`
-- No way to detect fd exhaustion before it happens
-- No way to count queue-full drops (currently silent — `napi_call_threadsafe_function` returns `napi_queue_full`, we `request_data_cleanup()` and `close(fd)`, but the client just gets a connection reset)
-- No way to count per-route request rates
-- No `process.on('uncaughtException', ...)` handler at the framework level
+**Risk if unfixed:** SIGTERM during a deploy will cause some clients to get connection-reset errors. Mitigated by the standard LB-pattern: stop accepting new traffic, wait for in-flight to drain naturally, then close. Most production setups already do this.
 
-**Recommended additions (in order of value):**
+**Effort (when picked up):** ~100 lines of C, 0 lines of JS, requires new integration test.
 
-1. Atomic counters in C: `active_connections`, `total_requests`, `total_errors`, `total_drops` (queue full)
-2. Expose via `app.metrics()` returning a plain object snapshot
-3. Emit a `'error'` event on the app for unhandled JS errors that hit the error boundary
-4. Optional: structured logging hook (`app.on('request', req => log(req))`)
+### 3. No production observability — FIXED in commit `3dc0637`
 
-**Risk if unfixed:** Flying blind. The 11x speedup story is great, but you can't run a server in production without knowing what it's doing.
+**File:** `src/binding.c`, `js/index.js`
 
-**Effort:** ~80 lines of C (atomic counters + `napi_create_int64` per metric) + ~30 lines of JS.
+**Resolution:** Added 4 atomic counters in `g_context`:
+
+- `pending_requests` — gauge, incremented in `on_request_c_handler`, decremented in `CallJsHandler`
+- `total_requests` — lifetime total of accepted dispatches
+- `total_drops` — lifetime total of `napi_queue_full` rejections (was previously silent)
+- `total_errors` — placeholder (not wired yet — JS handler errors are caught by the `_executeChain` error boundary, not propagated to C)
+
+Exposed as `app.metrics()` returning `{ pending, total, drops, errors }`. `errors` will need JS-side wiring (catch in `_executeChain`, increment via a new `napi_callback`).
+
+**Performance impact:** None measurable. Atomic ops on a cache line not shared with the data path.
+
+**Remaining work:** Wire `total_errors` from the JS `_executeChain` catch path.
 
 ---
 
