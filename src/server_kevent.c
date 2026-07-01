@@ -251,6 +251,54 @@ static int conn_write_buffered(kevent_context_t* ctx, connection_t* conn,
   return 0;
 }
 
+/* Try to write data directly to socket. Returns bytes written on success,
+ * 0 if kernel buffer is full (EAGAIN), -1 on error. For partial writes,
+ * sets *remaining to the unwritten portion. */
+static ssize_t try_write(int fd, const void* data, size_t len) {
+  ssize_t n = write(fd, data, len);
+  if (n < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
+    return -1;
+  }
+  return n;
+}
+
+/* Enable kevent write notification for the connection (out_buffer has data) */
+static void arm_write(kevent_context_t* ctx, int fd, connection_t* conn) {
+  struct kevent ev;
+  EV_SET(&ev, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_CLEAR, 0, 0, conn);
+  kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+}
+
+/* Disable kevent write notification (out_buffer is empty) */
+static void disarm_write(kevent_context_t* ctx, int fd) {
+  struct kevent ev;
+  EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+  kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+}
+
+/* Write data to the connection. Tries synchronous write first (avoids memcpy
+ * to out_buffer for the common case). On EAGAIN or partial write, the
+ * unsent portion is buffered in out_buffer and write notification is armed. */
+static int conn_try_write(kevent_context_t* ctx, connection_t* conn, int fd,
+                          const void* data, size_t len) {
+  if (conn->out_buffer_len > 0) {
+    /* Already have buffered data — append to buffer */
+    conn_write_buffered(ctx, conn, data, len);
+    return 0;
+  }
+  ssize_t n = try_write(fd, data, len);
+  if (n < 0) {
+    close_connection(ctx, fd);
+    return -1;
+  }
+  if ((size_t)n < len) {
+    conn_write_buffered(ctx, conn, (const uint8_t*)data + n, len - n);
+    arm_write(ctx, fd, conn);
+  }
+  return 0;
+}
+
 static void handle_client_write(kevent_context_t* ctx, int fd,
                                 connection_t* conn) {
   if (conn->out_buffer_len == 0) return;
@@ -258,9 +306,7 @@ static void handle_client_write(kevent_context_t* ctx, int fd,
                     conn->out_buffer_len - conn->out_buffer_pos);
   if (n < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      struct kevent ev;
-      EV_SET(&ev, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_CLEAR, 0, 0, conn);
-      kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+      arm_write(ctx, fd, conn);
       return;
     }
     close_connection(ctx, fd);
@@ -270,9 +316,7 @@ static void handle_client_write(kevent_context_t* ctx, int fd,
   if (conn->out_buffer_pos == conn->out_buffer_len) {
     conn->out_buffer_pos = 0;
     conn->out_buffer_len = 0;
-    struct kevent ev;
-    EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+    disarm_write(ctx, fd);
     if (conn->request_complete && conn->headers_sent) {
       if (!conn->keep_alive)
         close_connection(ctx, fd);
@@ -280,9 +324,7 @@ static void handle_client_write(kevent_context_t* ctx, int fd,
         reset_connection(conn);
     }
   } else {
-    struct kevent ev;
-    EV_SET(&ev, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_CLEAR, 0, 0, conn);
-    kevent(ctx->kq, &ev, 1, NULL, 0, NULL);
+    arm_write(ctx, fd, conn);
   }
 }
 
@@ -333,7 +375,7 @@ static void handle_client_read(kevent_context_t* ctx, int fd,
       size_t frl = 0;
       if (fast_router_try_handle_full(res.method, res.method_len, res.path,
                                       res.path_len, &fr, &frl) == 0) {
-        conn_write_buffered(ctx, conn, fr, frl);
+        conn_try_write(ctx, conn, fd, fr, frl);
         processed++;
         offset += res.bytes_consumed;
         if (res.http_minor < 1) {
@@ -480,36 +522,113 @@ int server_stop(server_handle_t s, uint32_t timeout_ms) {
   return 0;
 }
 
+static void append_str(char** p, char* end, const char* src, size_t len) {
+  if (*p + len <= end) {
+    memcpy(*p, src, len);
+    *p += len;
+  }
+}
+static void append_uint64(char** p, char* end, uint64_t v) {
+  char buf[20], *bp = buf + 20;
+  if (v == 0) {
+    *--bp = '0';
+  } else {
+    while (v > 0) {
+      *--bp = '0' + (v % 10);
+      v /= 10;
+    }
+  }
+  size_t n = buf + 20 - bp;
+  if (*p + n <= end) {
+    memcpy(*p, bp, n);
+    *p += n;
+  }
+}
+
 int server_send_response(server_handle_t s, connection_t* conn,
                          const response_t* res) {
   kevent_context_t* ctx = (kevent_context_t*)conn->platform_ctx;
   if (!ctx) ctx = &s->workers[0];
 
-  char head[4096];
-  size_t hlen = 0;
+  char head[4096], *p = head, *end = head + sizeof(head);
 
-  /* 1. Format status line */
-  hlen += snprintf(head + hlen, sizeof(head) - hlen, "HTTP/1.1 %d OK\r\n",
-                   res->status_code);
+/* 1. Status line — pre-formatted strings, no snprintf */
+#define S(s) s, (sizeof(s) - 1)
+  if (res->status_code == 200) {
+    append_str(&p, end, S("HTTP/1.1 200 OK\r\n"));
+  } else if (res->status_code == 201) {
+    append_str(&p, end, S("HTTP/1.1 201 Created\r\n"));
+  } else if (res->status_code == 204) {
+    append_str(&p, end, S("HTTP/1.1 204 No Content\r\n"));
+  } else if (res->status_code == 301) {
+    append_str(&p, end, S("HTTP/1.1 301 Moved Permanently\r\n"));
+  } else if (res->status_code == 302) {
+    append_str(&p, end, S("HTTP/1.1 302 Found\r\n"));
+  } else if (res->status_code == 304) {
+    append_str(&p, end, S("HTTP/1.1 304 Not Modified\r\n"));
+  } else if (res->status_code == 400) {
+    append_str(&p, end, S("HTTP/1.1 400 Bad Request\r\n"));
+  } else if (res->status_code == 401) {
+    append_str(&p, end, S("HTTP/1.1 401 Unauthorized\r\n"));
+  } else if (res->status_code == 403) {
+    append_str(&p, end, S("HTTP/1.1 403 Forbidden\r\n"));
+  } else if (res->status_code == 404) {
+    append_str(&p, end, S("HTTP/1.1 404 Not Found\r\n"));
+  } else if (res->status_code == 405) {
+    append_str(&p, end, S("HTTP/1.1 405 Method Not Allowed\r\n"));
+  } else if (res->status_code == 413) {
+    append_str(&p, end, S("HTTP/1.1 413 Payload Too Large\r\n"));
+  } else if (res->status_code == 429) {
+    append_str(&p, end, S("HTTP/1.1 429 Too Many Requests\r\n"));
+  } else if (res->status_code == 500) {
+    append_str(&p, end, S("HTTP/1.1 500 Internal Server Error\r\n"));
+  } else if (res->status_code == 502) {
+    append_str(&p, end, S("HTTP/1.1 502 Bad Gateway\r\n"));
+  } else if (res->status_code == 503) {
+    append_str(&p, end, S("HTTP/1.1 503 Service Unavailable\r\n"));
+  } else {
+    append_str(&p, end, S("HTTP/1.1 "));
+    append_uint64(&p, end, res->status_code);
+    append_str(&p, end, S(" Unknown\r\n"));
+  }
 
-  /* 2. Format headers */
+  /* 2. Headers — memcpy only, no snprintf */
   if (res->headers) {
     for (size_t i = 0; i < res->header_count * 2 && res->headers[i]; i += 2) {
-      hlen += snprintf(head + hlen, sizeof(head) - hlen, "%s: %s\r\n",
-                       res->headers[i], res->headers[i + 1]);
+      size_t kn = strlen(res->headers[i]);
+      size_t vn = strlen(res->headers[i + 1]);
+      if (p + kn + 2 + vn + 2 <= end) {
+        memcpy(p, res->headers[i], kn);
+        p += kn;
+        *p++ = ':';
+        *p++ = ' ';
+        memcpy(p, res->headers[i + 1], vn);
+        p += vn;
+        *p++ = '\r';
+        *p++ = '\n';
+      }
     }
   }
 
-  /* 3. Format Content-Length */
-  hlen += snprintf(head + hlen, sizeof(head) - hlen,
-                   "Content-Length: %zu\r\n\r\n", res->body_len);
+  /* 3. Content-Length — integer-to-string, no snprintf */
+  append_str(&p, end, S("Content-Length: "));
+  append_uint64(&p, end, res->body_len);
+  append_str(&p, end, S("\r\n\r\n"));
+#undef S
 
-  /* 4. Write headers */
-  if (conn_write(ctx, conn, head, hlen) < 0) return -1;
+  size_t hlen = p - head;
 
-  /* 5. Write body */
-  if (res->body && res->body_len > 0) {
+  /* 4. Write headers + body in a single syscall when body is small */
+  if (res->body && res->body_len > 0 && res->body_len <= 4096) {
+    char combined[16384];
+    memcpy(combined, head, hlen);
+    memcpy(combined + hlen, res->body, res->body_len);
+    if (conn_write(ctx, conn, combined, hlen + res->body_len) < 0) return -1;
+  } else if (res->body && res->body_len > 0) {
+    if (conn_write(ctx, conn, head, hlen) < 0) return -1;
     if (conn_write(ctx, conn, res->body, res->body_len) < 0) return -1;
+  } else {
+    if (conn_write(ctx, conn, head, hlen) < 0) return -1;
   }
 
   conn->headers_sent = true;

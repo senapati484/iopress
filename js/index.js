@@ -29,18 +29,6 @@ const os = require('os');
 // eslint-disable-next-line no-unused-vars
 const { spawn } = require('child_process');
 
-function escapeHtml(str) {
-  if (str.indexOf('&') === -1 && str.indexOf('<') === -1 &&
-      str.indexOf('>') === -1 && str.indexOf('"') === -1 &&
-      str.indexOf('\'') === -1) return str;
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
 if (process.env.IOPRESS_WORKER === '1') {
   module.exports = function() {
     const app = { routes: [], middleware: [], params: {} };
@@ -270,7 +258,7 @@ class Response {
     }
 
     this.statusCode = 200;
-    this.headers = {};
+    this.headers = { 'x-content-type-options': 'nosniff' };
     this._binding = binding;
     this._fd = nativeRes.fd;
     this._sent = false;
@@ -379,15 +367,12 @@ class Response {
       return this;
     }
 
+    const bodyStr = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
+    this._cachedBody = bodyStr;
+
     if (!this.get('content-type')) {
       this.set('Content-Type', 'text/plain; charset=utf-8');
     }
-
-    this.set('X-Content-Type-Options', 'nosniff');
-
-    const isJson = this.get('content-type') === 'application/json';
-    const bodyStr = Buffer.isBuffer(data) ? data.toString('utf8') : isJson ? String(data) : escapeHtml(String(data));
-    this._cachedBody = bodyStr;
 
     this._binding.SendResponse(
       this._fd,
