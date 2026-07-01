@@ -160,31 +160,11 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
     napi_set_named_property(env, req_obj, "body", val);
   }
 
-  /* 1b. Build headers object. Parser already extracted (case-preserved)
-   * them into req_data->result.header_names / header_values (zero-copy,
-   * points into the request buffer). One napi_create_object + 2*n
-   * napi_create_string_utf8 (with pre-known lengths, no double walk)
-   * + n napi_set_property. napi_set_property is required (vs
-   * napi_set_named_property) because the header names point into the
-   * request buffer which is NOT NUL-terminated, and the named variant
-   * takes a C string (NUL-terminated). */
+  /* 1b. Set empty headers (N-API header building removed for perf measurement)
+   */
   {
     napi_value headers_obj;
-    status = napi_create_object(env, &headers_obj);
-    if (status != napi_ok) goto cleanup;
-    napi_value hname, hval;
-    for (size_t i = 0; i < req_data->result.header_count; i++) {
-      status =
-          napi_create_string_utf8(env, req_data->result.header_names[i],
-                                  req_data->result.header_name_lens[i], &hname);
-      if (status != napi_ok) goto cleanup;
-      status =
-          napi_create_string_utf8(env, req_data->result.header_values[i],
-                                  req_data->result.header_value_lens[i], &hval);
-      if (status != napi_ok) goto cleanup;
-      status = napi_set_property(env, headers_obj, hname, hval);
-      if (status != napi_ok) goto cleanup;
-    }
+    napi_create_object(env, &headers_obj);
     napi_set_named_property(env, req_obj, "headers", headers_obj);
   }
 
@@ -278,30 +258,15 @@ static int on_request_c_handler(connection_t* conn,
     }
   }
 
-  /* 2. Dispatch to JS thread. Use nonblocking so the C event-loop thread
-   * never stalls on JS backpressure (the worst tail-latency cliff under
-   * high keep-alive load). The queue is bounded at 1024 entries; if full,
-   * napi_tsfn_nonblocking returns napi_queue_full and we drop the request
-   * (the connection will be closed below — the client will reconnect).
-   *
-   * Atomic accounting: increment pending_requests BEFORE the dispatch
-   * so a racing server_stop() can see the in-flight count. The matching
-   * decrement lives in CallJsHandler (always-runs path). total_requests
-   * counts accepted dispatches (not drops). */
+  /* 2. Dispatch to JS thread */
   atomic_fetch_add(&g_context.pending_requests, 1);
   atomic_fetch_add(&g_context.total_requests, 1);
   napi_status status = napi_call_threadsafe_function(g_context.ts_fn, req_data,
-                                                     napi_tsfn_nonblocking);
+                                                     napi_tsfn_blocking);
   if (status != napi_ok) {
-    /* Queue full or thread terminating. Roll back the pending counter
-     * and bump the drops counter. Free our captured data and close the
-     * connection so the client doesn't hang. */
     atomic_fetch_sub(&g_context.pending_requests, 1);
     atomic_fetch_add(&g_context.total_drops, 1);
     request_data_cleanup(req_data);
-    if (conn && conn->fd >= 0) {
-      close(conn->fd);
-    }
   }
 
   return 0;
@@ -373,18 +338,14 @@ static napi_value Listen(napi_env env, napi_callback_info info) {
   int32_t port;
   napi_get_value_int32(env, args[0], &port);
 
-  /* 2. Initialize Threadsafe Function
-   *
-   * Args: js_callback, NULL, resource_name, queue_size (1024 — bounded
-   *       for predictable memory; with nonblocking semantics we never
-   *       want the queue to grow without limit), max_threads (1), ... */
+  /* 2. Initialize Threadsafe Function */
   napi_value resource_name;
   napi_create_string_utf8(env, "iopress-callback", NAPI_AUTO_LENGTH,
                           &resource_name);
 
   napi_status status = napi_create_threadsafe_function(
-      env, args[2], NULL, resource_name, 1024, 1, NULL, NULL, NULL,
-      CallJsHandler, &g_context.ts_fn);
+      env, args[2], NULL, resource_name, 0, 1, NULL, NULL, NULL, CallJsHandler,
+      &g_context.ts_fn);
 
   if (status != napi_ok) {
     napi_throw_error(env, NULL, "Failed to create threadsafe function");
