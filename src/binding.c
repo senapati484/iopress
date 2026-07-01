@@ -160,11 +160,34 @@ static void CallJsHandler(napi_env env, napi_value js_callback, void* context,
     napi_set_named_property(env, req_obj, "body", val);
   }
 
-  /* 1b. Set empty headers (N-API header building removed for perf measurement)
-   */
+  /* 1b. Build headers object. Parser already extracted and lowercased
+   * them into req_data->result.header_names / header_values (zero-copy,
+   * points into the request buffer). Use napi_define_properties to batch
+   * all property definitions in one call instead of per-header set_property. */
   {
     napi_value headers_obj;
-    napi_create_object(env, &headers_obj);
+    status = napi_create_object(env, &headers_obj);
+    if (status != napi_ok) goto cleanup;
+    size_t hc = req_data->result.header_count;
+    if (hc > 0) {
+      napi_value hnames[128];
+      napi_value hvals[128];
+      napi_property_descriptor props[128];
+      for (size_t i = 0; i < hc; i++) {
+        napi_create_string_utf8(env, req_data->result.header_names[i],
+                                req_data->result.header_name_lens[i],
+                                &hnames[i]);
+        napi_create_string_utf8(env, req_data->result.header_values[i],
+                                req_data->result.header_value_lens[i],
+                                &hvals[i]);
+        props[i] = (napi_property_descriptor){
+            .name = hnames[i],
+            .value = hvals[i],
+            .attributes = napi_enumerable,
+        };
+      }
+      napi_define_properties(env, headers_obj, hc, props);
+    }
     napi_set_named_property(env, req_obj, "headers", headers_obj);
   }
 
