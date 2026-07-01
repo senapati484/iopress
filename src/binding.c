@@ -230,11 +230,21 @@ static int on_request_c_handler(connection_t* conn,
     }
   }
 
-  /* 2. Dispatch to JS thread */
+  /* 2. Dispatch to JS thread. Use nonblocking so the C event-loop thread
+   * never stalls on JS backpressure (the worst tail-latency cliff under
+   * high keep-alive load). The queue is bounded at 1024 entries; if full,
+   * napi_tsfn_nonblocking returns napi_queue_full and we drop the request
+   * (the connection will be closed below — the client will reconnect). */
   napi_status status = napi_call_threadsafe_function(g_context.ts_fn, req_data,
-                                                     napi_tsfn_blocking);
+                                                     napi_tsfn_nonblocking);
   if (status != napi_ok) {
+    /* Queue full or thread terminating. Free our captured data and close
+     * the connection so the client doesn't hang. The kqueue backend will
+     * see the fd close and clean up its connection slot. */
     request_data_cleanup(req_data);
+    if (conn && conn->fd >= 0) {
+      close(conn->fd);
+    }
   }
 
   return 0;
@@ -306,14 +316,18 @@ static napi_value Listen(napi_env env, napi_callback_info info) {
   int32_t port;
   napi_get_value_int32(env, args[0], &port);
 
-  /* 2. Initialize Threadsafe Function */
+  /* 2. Initialize Threadsafe Function
+   *
+   * Args: js_callback, NULL, resource_name, queue_size (1024 — bounded
+   *       for predictable memory; with nonblocking semantics we never
+   *       want the queue to grow without limit), max_threads (1), ... */
   napi_value resource_name;
   napi_create_string_utf8(env, "iopress-callback", NAPI_AUTO_LENGTH,
                           &resource_name);
 
   napi_status status = napi_create_threadsafe_function(
-      env, args[2], NULL, resource_name, 0, 1, NULL, NULL, NULL, CallJsHandler,
-      &g_context.ts_fn);
+      env, args[2], NULL, resource_name, 1024, 1, NULL, NULL, NULL,
+      CallJsHandler, &g_context.ts_fn);
 
   if (status != napi_ok) {
     napi_throw_error(env, NULL, "Failed to create threadsafe function");
