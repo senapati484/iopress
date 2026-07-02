@@ -62,7 +62,7 @@ npm install @iopress/core
   * **Express Compatible**: Familiar API for seamless migration.
   * **Zero Dependency**: Minimal runtime footprint with focused native core.
   * **Built-in Body Parsing**: High-performance JSON and raw body parsing included.
-  * **Scalability**: Designed to handle 500k+ requests per second on a single instance.
+  * **Scalability**: Designed to handle 500k+ requests per second on Linux via `io_uring` (projected — see [Performance](#performance-why-iopress)).
 
 ## Docs & Community
 
@@ -83,7 +83,7 @@ The quickest way to get started is to create a simple script:
 
 ## Philosophy
 
-  The iopress philosophy is to deliver **native performance** to the Node.js ecosystem without sacrificing the **minimalist developer experience** pioneered by Express. 
+  The iopress philosophy is to deliver **native performance** to the Node.js ecosystem without sacrificing the **minimalist developer experience** pioneered by Express.
 
   While Express relies on the generic `libuv` event loop, iopress utilizes the latest kernel-level asynchronous interfaces directly. This allows iopress to bypass traditional bottlenecks, making it the ideal engine for high-throughput APIs, proxy layers, and performance-critical services.
 
@@ -91,14 +91,47 @@ The quickest way to get started is to create a simple script:
 
   iopress is designed to outperform traditional Node.js frameworks by leveraging direct kernel communication and a "fast-path" routing system.
 
-| Framework | Platform | Throughput (req/s) | Latency (p99) |
-|-----------|----------|-------------------|---------------|
-| **iopress** | **Linux (io_uring)** | **500,000+** | **<1ms** |
-| **iopress** | **macOS (kqueue)** | **218,572** | **<1ms** |
-| **iopress** | **Windows (IOCP)** | **100,000+** | **<5ms** |
-| Express.js | Any | ~17,000 | ~20ms |
+  > **Note:** Only macOS (Apple M2, `kqueue`) has been benchmarked so far — those numbers below are measured, not estimated. Linux (`io_uring`) and Windows (`IOCP`) figures are **projected** based on the known throughput characteristics of each backend relative to `kqueue`, and will be replaced with real measurements as they become available. As a rule of thumb we expect Linux (`io_uring`) to outperform macOS, and Windows (`IOCP`) to trail behind it.
 
-  *Benchmarks performed on Apple M2 (macOS) and Ubuntu 22.04 (Linux).*
+  ### Summary
+
+| Framework  | Platform             | Throughput (req/s)  | Latency (p99)     |
+| ---------- | --------------------- | -------------------- | ------------------ |
+| **iopress** | **Linux (io_uring)**  | **500,000+** *(projected)* | **<15ms** *(projected)* |
+| **iopress** | **macOS (kqueue)**    | **211,854** *(measured)*   | **28ms** *(measured)*   |
+| **iopress** | **Windows (IOCP)**    | **100,000+** *(projected)* | **<45ms** *(projected)* |
+| Express.js  | Any *(tested on macOS)* | 17,280 *(measured)*      | 1,531ms *(measured)*    |
+
+  *Benchmarks performed on Apple M2 (macOS 14, Node.js 18+). Linux figures were previously benchmarked on Ubuntu 22.04 during early development; Windows figures are estimated. Fresh Linux/Windows numbers will be published once re-run on current hardware.*
+
+  ### Detailed macOS (M2) results — fast path
+
+  Static routes (`hello-world`, `health-check`), handled entirely in the native fast path:
+
+  | Scenario         | @iopress/core | Express.js |
+  | ----------------- | -------------- | ---------- |
+  | hello-world        | 211,854 req/s  | —          |
+  | health-check        | 209,164 req/s  | —          |
+  | head-to-head (avg)  | 211,854 req/s  | 17,280 req/s |
+  | Mean latency        | 23.36 ms       | 107.33 ms  |
+  | p99 latency         | 28 ms          | 1,531 ms   |
+
+  → **~12.3x** more throughput than Express.js on identical hardware, with a **~55x** lower p99 latency.
+
+  ### Detailed macOS (M2) results — slow path
+
+  Routes that require JS-side handling (param parsing, JSON body parsing, query parsing) — 500 connections, pipelining 10, 5s × 3 runs:
+
+  | Scenario      | Throughput (req/s) | p99 latency |
+  | -------------- | -------------------- | ------------ |
+  | route-params    | 159,639               | 38 ms        |
+  | json-body        | 122,946               | 43 ms        |
+  | query-params     | 163,643               | 39 ms        |
+  | **Average**       | **148,743**            | —            |
+
+  `json-body` is the current bottleneck on the slow path due to JSON parsing overhead — this is a known area for future optimization.
+
+  All benchmarks pass the project's minimum throughput threshold of 150,000 req/s on the fast path.
 
 ## Examples
 
@@ -140,13 +173,23 @@ pkill -f node
 
 ## License
 
-ISC License
+Apache License, Version 2.0
 
 Copyright (c) 2024 senapati484
 
-Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+**Trademark Notice:** The "iopress" name and logo are trademarks of senapati484. You may not use the "iopress" name or logo in a way that suggests endorsement, affiliation, or official status without prior written permission. Modified or derivative versions must not use the "iopress" name or logo without explicit written consent. Refer to the [LICENSE](LICENSE) file for the full trademark policy.
 
 ---
 
