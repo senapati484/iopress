@@ -23,7 +23,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@iopress/core)](https://npmjs.org/package/@iopress/core)
 [![NPM Downloads](https://img.shields.io/npm/dm/@iopress/core)](https://npmcharts.com/compare/@iopress/core?minimal=true)
 [![CI Build](https://github.com/senapati484/iopress/actions/workflows/ci.yml/badge.svg)](https://github.com/senapati484/iopress/actions)
-[![License](https://img.shields.io/npm/l/@iopress/core)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ```js
 const iopress = require('@iopress/core')
@@ -89,49 +89,62 @@ The quickest way to get started is to create a simple script:
 
 ## Performance (Why iopress?)
 
-  iopress is designed to outperform traditional Node.js frameworks by leveraging direct kernel communication and a "fast-path" routing system.
+iopress is designed to outperform traditional Node.js frameworks by leveraging direct kernel communication and a "fast-path" routing system.
 
-  > **Note:** Only macOS (Apple M2, `kqueue`) has been benchmarked so far — those numbers below are measured, not estimated. Linux (`io_uring`) and Windows (`IOCP`) figures are **projected** based on the known throughput characteristics of each backend relative to `kqueue`, and will be replaced with real measurements as they become available. As a rule of thumb we expect Linux (`io_uring`) to outperform macOS, and Windows (`IOCP`) to trail behind it.
+> **Tested** — macOS (Apple M2, `kqueue`) numbers below come from real benchmark runs.
+> **Untested** — Linux (`io_uring`) and Windows (`IOCP`) numbers are estimated from the known characteristics of each backend relative to `kqueue`, and will be swapped for real measurements once re-run on that hardware. Expect Linux to outperform macOS, and Windows to trail behind it.
 
-  ### Summary
+### 🏆 Summary
 
-| Framework  | Platform             | Throughput (req/s)  | Latency (p99)     |
-| ---------- | --------------------- | -------------------- | ------------------ |
-| **iopress** | **Linux (io_uring)**  | **500,000+** *(projected)* | **<15ms** *(projected)* |
-| **iopress** | **macOS (kqueue)**    | **211,854** *(measured)*   | **28ms** *(measured)*   |
-| **iopress** | **Windows (IOCP)**    | **100,000+** *(projected)* | **<45ms** *(projected)* |
-| Express.js  | Any *(tested on macOS)* | 17,280 *(measured)*      | 1,531ms *(measured)*    |
+| Framework   | Platform                 | Throughput (req/s)         | Latency (p99)            |
+| ----------- | ------------------------- | ---------------------------- | --------------------------- |
+| **iopress** | **Linux (io_uring)**       | **500,000+** *(untested)*    | **<15ms** *(untested)*      |
+| **iopress** | **macOS (kqueue)**         | **211,854** *(tested)*       | **28ms** *(tested)*         |
+| **iopress** | **Windows (IOCP)**         | **100,000+** *(untested)*    | **<45ms** *(untested)*      |
+| Express.js  | Any *(tested on macOS)*    | 17,280 *(tested)*            | 1,531ms *(tested)*          |
 
-  *Benchmarks performed on Apple M2 (macOS 14, Node.js 18+). Linux figures were previously benchmarked on Ubuntu 22.04 during early development; Windows figures are estimated. Fresh Linux/Windows numbers will be published once re-run on current hardware.*
+*Benchmarked on Apple M2 (macOS 14, Node.js 18+). Linux figures were previously benchmarked on Ubuntu 22.04 during early development; Windows figures are estimated. Fresh Linux/Windows numbers will be published once re-run on current hardware.*
 
-  ### Detailed macOS (M2) results — fast path
+### 📈 Detailed benchmark results
 
-  Static routes (`hello-world`, `health-check`), handled entirely in the native fast path:
+<details>
+<summary><b>⚡ Fast path — static routes (click to expand)</b></summary>
 
-  | Scenario         | @iopress/core | Express.js |
-  | ----------------- | -------------- | ---------- |
-  | hello-world        | 211,854 req/s  | —          |
-  | health-check        | 209,164 req/s  | —          |
-  | head-to-head (avg)  | 211,854 req/s  | 17,280 req/s |
-  | Mean latency        | 23.36 ms       | 107.33 ms  |
-  | p99 latency         | 28 ms          | 1,531 ms   |
+<br>
 
-  → **~12.3x** more throughput than Express.js on identical hardware, with a **~55x** lower p99 latency.
+Static routes (`hello-world`, `health-check`), handled entirely in the native fast path — head-to-head vs. Express.js on identical hardware:
 
-  ### Detailed macOS (M2) results — slow path
+| Scenario            | @iopress/core   | Express.js   |
+| -------------------- | ---------------- | ------------- |
+| `hello-world`         | **211,854 req/s** | —             |
+| `health-check`         | **209,164 req/s** | —             |
+| Head-to-head (avg)     | **211,854 req/s** | 17,280 req/s  |
+| Mean latency            | **23.36 ms**      | 107.33 ms     |
+| p99 latency             | **28 ms**         | 1,531 ms      |
 
-  Routes that require JS-side handling (param parsing, JSON body parsing, query parsing) — 500 connections, pipelining 10, 5s × 3 runs:
+> 🚀 **~12.3x** more throughput than Express.js, with **~55x** lower p99 latency.
 
-  | Scenario      | Throughput (req/s) | p99 latency |
-  | -------------- | -------------------- | ------------ |
-  | route-params    | 159,639               | 38 ms        |
-  | json-body        | 122,946               | 43 ms        |
-  | query-params     | 163,643               | 39 ms        |
-  | **Average**       | **148,743**            | —            |
+</details>
 
-  `json-body` is the current bottleneck on the slow path due to JSON parsing overhead — this is a known area for future optimization.
+<details>
+<summary><b>🐢 Slow path — JS-handled routes (click to expand)</b></summary>
 
-  All benchmarks pass the project's minimum throughput threshold of 150,000 req/s on the fast path.
+<br>
+
+Routes requiring JS-side handling (param parsing, JSON body parsing, query parsing). Test config: 500 connections, pipelining 10, 5s × 3 runs.
+
+| Scenario         | Throughput (req/s) | p99 latency |
+| ------------------ | --------------------- | -------------- |
+| `route-params`       | 159,639                | 38 ms          |
+| `json-body`           | 122,946                | 43 ms          |
+| `query-params`        | 163,643                | 39 ms          |
+| **Average**            | **148,743**             | —              |
+
+> ⚠️ `json-body` is the current bottleneck on the slow path due to JSON parsing overhead — this is a known area for future optimization.
+
+> ✅ All benchmarks pass the project's minimum throughput threshold of **150,000 req/s** on the fast path.
+
+</details>
 
 ## Examples
 
@@ -173,24 +186,16 @@ pkill -f node
 
 ## License
 
-Apache License, Version 2.0
+Licensed under the **[Apache License 2.0](LICENSE)**.
 
-Copyright (c) 2024 senapati484
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-**Trademark Notice:** The "iopress" name and logo are trademarks of senapati484. You may not use the "iopress" name or logo in a way that suggests endorsement, affiliation, or official status without prior written permission. Modified or derivative versions must not use the "iopress" name or logo without explicit written consent. Refer to the [LICENSE](LICENSE) file for the full trademark policy.
+"Iopress" and the Iopress logo are trademarks of senapati484. Forks and derivative projects are welcome under the license terms above, but should not use the Iopress name or logo in a way that implies official endorsement.
 
 ---
 
-**Made with performance in mind.** If you find @iopress/core useful, please consider starring the repository on GitHub!
+<div align="center">
+
+Made with ❤️ by [**senapati484**](https://github.com/senapati484)
+
+If iopress helped you build something fast, consider giving it a ⭐ on GitHub — it genuinely helps!
+
+</div>
