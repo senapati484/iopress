@@ -98,6 +98,11 @@ typedef struct connection_s {
 
   /** Pool management */
   bool uses_pool_buffer;
+
+  /** Guards against double RECV re-arm (set by server_resume_read,
+   *  cleared by OP_RECV handler on next completion).
+   *  Currently only used by the IOCP backend; ignored by kqueue/io_uring. */
+  bool recv_armed;
 } connection_t;
 
 typedef int (*request_callback_t)(connection_t* conn,

@@ -38,6 +38,9 @@
 // clang-format on
 #pragma warning(pop)
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "fast_router.h"
 #include "parser.h"
 
@@ -87,10 +90,6 @@ typedef struct {
 
   connection_t* connections;
   size_t max_connections;
-  CRITICAL_SECTION cs;
-
-  /* SQE data recycling to avoid malloc in hot path */
-  iocp_overlapped_t accept_ov;
 } iocp_context_t;
 
 struct server_handle_s {
@@ -107,12 +106,6 @@ static int set_nonblocking(SOCKET fd) {
   return ioctlsocket(fd, FIONBIO, &mode);
 }
 
-static int set_reuseport(SOCKET fd) {
-  int opt = 1;
-  return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
-                    sizeof(opt));
-}
-
 static int set_reuseaddr(SOCKET fd) {
   int opt = 1;
   return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt,
@@ -127,7 +120,6 @@ static int set_nodelay(SOCKET fd) {
 
 static int set_socket_options(SOCKET fd) {
   set_reuseaddr(fd);
-  set_reuseport(fd);
   set_nodelay(fd);
 
   int sndbuf = 1048576;
@@ -361,13 +353,19 @@ static void close_connection(iocp_context_t* ctx, SOCKET fd) {
 
   connection_t* conn = &ctx->connections[fd];
   if (conn->fd != INVALID_SOCKET) {
+    /* CRITICAL: set fd to INVALID_SOCKET BEFORE closesocket().
+     * If we close the socket first, the kernel may reuse the freed
+     * handle via accept() on another thread before we update conn->fd.
+     * A concurrent OP_SEND cancellation that reads conn->fd (still the
+     * old value) would close the NEW connection. */
+    conn->fd = INVALID_SOCKET;
+    conn->closed = true;
+
     if (ctx->on_connection) {
       ctx->on_connection(conn, 1, ctx->user_data);
     }
 
     closesocket(fd);
-    conn->fd = INVALID_SOCKET;
-    conn->closed = true;
 
     if (conn->buffer) {
       free(conn->buffer);
@@ -390,15 +388,12 @@ static void close_connection(iocp_context_t* ctx, SOCKET fd) {
     conn->out_buffer_len = 0;
     conn->out_buffer_pos = 0;
 
-    /* Cleanup platform_sqe_data */
-    if (conn->platform_sqe_data_recv) {
-      free(conn->platform_sqe_data_recv);
-      conn->platform_sqe_data_recv = NULL;
-    }
-    if (conn->platform_sqe_data_send) {
-      free(conn->platform_sqe_data_send);
-      conn->platform_sqe_data_send = NULL;
-    }
+    /* NOTE: platform_sqe_data_recv is NOT freed here — a WSARecv may still
+     * be pending on the IOCP. closesocket() above cancels all pending I/O;
+     * the cancelled completion will arrive on the worker thread, which
+     * detects conn->fd==INVALID_SOCKET and frees the overlapped there.
+     * platform_sqe_data_send is always dynamically allocated per send and
+     * freed in the OP_SEND handler — no cleanup needed here either. */
   }
 }
 /* ============================================================================
@@ -422,7 +417,18 @@ static DWORD WINAPI worker_thread(LPVOID param) {
         if (ov->conn && ov->conn->fd != INVALID_SOCKET) {
           close_connection(ctx, (SOCKET)ov->conn->fd);
         }
-        if (ov->type == OP_SEND) free(ov);
+        /* Dynamic overlapped types must be freed here.
+         * OP_RECV uses pre-allocated per-connection overlapped, but on
+         * cancellation (i.e. close_connection ran from above) the
+         * conn-side pointer was already nulled in the connection cleanup
+         * — still safe to free the overlapped itself. */
+        if (ov->type == OP_RECV && ov->conn) {
+          ov->conn->platform_sqe_data_recv = NULL;
+        }
+        if (ov->type == OP_ACCEPT || ov->type == OP_SEND ||
+            ov->type == OP_RECV) {
+          free(ov);
+        }
       }
       continue;
     }
@@ -465,18 +471,70 @@ static DWORD WINAPI worker_thread(LPVOID param) {
             closesocket(client);
           }
         }
-        /* ACCEPT object is static in context, don't free */
+        /* Per-accept overlapped was heap-allocated; must free */
+        free(ov);
         break;
       }
 
       case OP_RECV: {
         connection_t* conn = (connection_t*)key;
         if (bytes_transferred == 0) {
-          close_connection(ctx, (SOCKET)conn->fd);
+          if (conn->fd == (int)INVALID_SOCKET) {
+            /* Connection was already closed externally (e.g. server_stop).
+             * Clean up the in-flight recv overlapped. */
+            if (conn->platform_sqe_data_recv) {
+              free(conn->platform_sqe_data_recv);
+              conn->platform_sqe_data_recv = NULL;
+            }
+          } else {
+            close_connection(ctx, (SOCKET)conn->fd);
+            /* close_connection no longer frees platform_sqe_data_recv
+             * (may still be in-flight from a prior WSARecv). Now that
+             * the cancelled completion has arrived, free it. */
+            if (conn->platform_sqe_data_recv) {
+              free(conn->platform_sqe_data_recv);
+              conn->platform_sqe_data_recv = NULL;
+            }
+          }
           continue;
         }
 
-        conn->buffer_len = bytes_transferred;
+        /* Clear the recv_armed flag — a new RECV completion arrived.
+         * This allows the OP_RECV handler to re-arm RECV below when
+         * not processing (fast path / NEED_MORE), while preventing a
+         * double re-arm when server_resume_read already handled it
+         * (slow path). */
+        conn->recv_armed = false;
+
+        /* Accumulate data across multiple reads.
+         * WSARecv writes at conn->buffer + conn->buffer_len (set during
+         * the previous RECV re-arm). For the first read buffer_len is 0,
+         * so data lands at offset 0. For NEED_MORE continuations, data
+         * lands after the previously accumulated bytes. */
+        conn->buffer_len += bytes_transferred;
+        /* Grow buffer if needed for the next read. We check capacity
+         * after updating buffer_len so the next RECV re-arm below has
+         * room for at least one more chunk. */
+        size_t slack = conn->buffer_cap - conn->buffer_len;
+        if (slack < DEFAULT_INITIAL_BUFFER_SIZE) {
+          /* 1.5x growth capped at 64KB. Above 64KB most requests have
+           * already finished or we should be streaming; 1.5x gives
+           * ~25% average slack vs 2x's ~50%. The while-loop guarantees
+           * the new cap is at least large enough for the next read. */
+          size_t new_cap = conn->buffer_cap == 0
+                               ? DEFAULT_INITIAL_BUFFER_SIZE
+                               : conn->buffer_cap + conn->buffer_cap / 2;
+          if (new_cap > 65536) new_cap = 65536;
+          while (new_cap < conn->buffer_len + DEFAULT_INITIAL_BUFFER_SIZE)
+            new_cap += new_cap / 2;
+          uint8_t* new_buf = realloc(conn->buffer, new_cap);
+          if (!new_buf) {
+            close_connection(ctx, (SOCKET)conn->fd);
+            continue;
+          }
+          conn->buffer = new_buf;
+          conn->buffer_cap = new_cap;
+        }
 
         parse_result_t result;
         int status = http_parse_request((const uint8_t*)conn->buffer,
@@ -499,9 +557,18 @@ static DWORD WINAPI worker_thread(LPVOID param) {
             conn->headers_sent = true;
             server_write(NULL, conn, fast_response, fast_response_len);
           } else if (ctx->on_request) {
+            /* Set processing=true to prevent buffer overwrite while
+             * JS reads header pointers that reference conn->buffer.
+             * server_send_response will call server_resume_read to
+             * re-arm RECV when JS is done. */
+            conn->processing = true;
             ctx->on_request(conn, &result, ctx->user_data);
           }
+
+          /* Reset buffer for the next request (done/error handled) */
+          conn->buffer_len = 0;
         } else if (status == PARSE_STATUS_ERROR) {
+          conn->buffer_len = 0;
           const char* headers[] = {"Connection", "close", NULL};
           uint8_t response[256];
           size_t response_len;
@@ -511,16 +578,31 @@ static DWORD WINAPI worker_thread(LPVOID param) {
           close_connection(ctx, (SOCKET)conn->fd);
           continue;
         }
+        /* PARSE_STATUS_NEED_MORE: keep buffer_len as-is for accumulation. */
 
-        /* Re-arm RECV using the same object */
-        memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
-        ov->wsabuf.buf = conn->buffer;
-        ov->wsabuf.len = (ULONG)conn->buffer_cap;
+        /* Re-arm RECV only if:
+         *   1. JS is not processing the request (processing=false), AND
+         *   2. server_resume_read has not already re-armed RECV
+         * (recv_armed=false).
+         *
+         * When processing=true, server_resume_read (called from
+         * server_send_response) will re-arm after the JS handler completes
+         * and sets recv_armed=true, preventing a double re-arm here.
+         * For the fast path (no JS) and NEED_MORE, we re-arm here since
+         * recv_armed was cleared at the start of this handler. */
+        if (!conn->processing && !conn->recv_armed) {
+          memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
+          ov->wsabuf.buf = conn->buffer + conn->buffer_len;
+          ov->wsabuf.len = (ULONG)(conn->buffer_cap - conn->buffer_len);
 
-        DWORD received = 0;
-        DWORD flags = 0;
-        WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,
-                &ov->overlapped, NULL);
+          DWORD received = 0;
+          DWORD flags = 0;
+          if (WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,
+                      &ov->overlapped, NULL) == SOCKET_ERROR &&
+              WSAGetLastError() != WSA_IO_PENDING) {
+            close_connection(ctx, (SOCKET)conn->fd);
+          }
+        }
         break;
       }
 
@@ -558,15 +640,14 @@ static DWORD WINAPI worker_thread(LPVOID param) {
               close_connection(ctx, (SOCKET)conn->fd);
             }
           } else {
-            /* Completed sending all buffered data */
+            /* Completed sending all buffered data.
+             * Do NOT reset connection state here — OP_RECV may already be
+             * processing the next pipelined request. OP_RECV lazily cleans
+             * stale state before parsing the next request. */
             conn->out_buffer_pos = 0;
             conn->out_buffer_len = 0;
-            if (conn->request_complete && conn->headers_sent) {
-              if (!conn->keep_alive) {
-                close_connection(ctx, (SOCKET)conn->fd);
-              } else {
-                reset_connection(conn);
-              }
+            if (!conn->keep_alive && conn->headers_sent) {
+              close_connection(ctx, (SOCKET)conn->fd);
             }
           }
         } else {
@@ -626,8 +707,6 @@ server_handle_t server_init(const server_config_t* config,
     ctx->connections[i].fd = (int)INVALID_SOCKET;
   }
 
-  InitializeCriticalSection(&ctx->cs);
-
   ctx->listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (ctx->listen_socket == INVALID_SOCKET) {
     free(ctx->connections);
@@ -664,10 +743,6 @@ server_handle_t server_init(const server_config_t* config,
     return NULL;
   }
 
-  /* Init static accept data */
-  memset(&ctx->accept_ov, 0, sizeof(iocp_overlapped_t));
-  ctx->accept_ov.type = OP_ACCEPT;
-
   return server;
 }
 
@@ -676,11 +751,18 @@ static DWORD WINAPI accept_thread_func(LPVOID param) {
   while (ctx->running) {
     SOCKET client = accept(ctx->listen_socket, NULL, NULL);
     if (client != INVALID_SOCKET) {
-      iocp_overlapped_t* ov = &ctx->accept_ov;
-      ov->socket = client;
-      PostQueuedCompletionStatus(ctx->iocp, 0, 0, &ov->overlapped);
+      /* Allocate per-accept overlapped to avoid race with worker thread.
+       * The worker's OP_ACCEPT handler frees it after processing. */
+      iocp_overlapped_t* ov = malloc(sizeof(iocp_overlapped_t));
+      if (ov) {
+        memset(ov, 0, sizeof(iocp_overlapped_t));
+        ov->type = OP_ACCEPT;
+        ov->socket = client;
+        PostQueuedCompletionStatus(ctx->iocp, 0, 0, &ov->overlapped);
+      } else {
+        closesocket(client);
+      }
     }
-    Sleep(1);
   }
   return 0;
 }
@@ -710,8 +792,10 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
   ctx->running = false;
 
   /* First close the listen socket so that the blocking accept() call in
-   * accept_thread exits */
-  if (ctx->listen_socket) {
+   * accept_thread exits.
+   * NOTE: INVALID_SOCKET on Windows is ~(SOCKET)0 (non-zero), so the
+   * equality check is required — truthiness alone does not work. */
+  if (ctx->listen_socket != INVALID_SOCKET) {
     closesocket(ctx->listen_socket);
     ctx->listen_socket = INVALID_SOCKET;
   }
@@ -723,10 +807,18 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
     ctx->accept_thread = NULL;
   }
 
-  /* Signal and wait for worker threads */
+  /* Signal and wait for worker threads.
+   * Post ALL wakeups FIRST, then wait for each thread in a second loop.
+   * PostQueuedCompletionStatus wakes ANY thread from GQCS, so a sequential
+   * post-and-wait-per-thread loop would deadlock — thread T might consume
+   * the wakeup intended for thread S, while S stays blocked on GQCS. */
   for (int i = 0; i < WORKER_THREADS; i++) {
     if (ctx->worker_threads[i]) {
       PostQueuedCompletionStatus(ctx->iocp, 0, 0, NULL);
+    }
+  }
+  for (int i = 0; i < WORKER_THREADS; i++) {
+    if (ctx->worker_threads[i]) {
       WaitForSingleObject(ctx->worker_threads[i], INFINITE);
       CloseHandle(ctx->worker_threads[i]);
     }
@@ -745,7 +837,6 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
     free(ctx->connections);
   }
 
-  DeleteCriticalSection(&ctx->cs);
   WSACleanup();
 
   return 0;
@@ -753,13 +844,16 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
 
 int server_send_response(server_handle_t server, connection_t* conn,
                          const response_t* response) {
-  if (conn == NULL || response == NULL) return -1;
+  (void)server;
+  if (!conn || !response) return -1;
 
+  /* 1. Format status line + headers + Content-Length into stack buffer */
+  int status_code = response->status_code;
   char head[4096];
   size_t hlen = 0;
 
   const char* status_text = "OK";
-  switch (response->status_code) {
+  switch (status_code) {
     case 200:
       status_text = "OK";
       break;
@@ -777,13 +871,11 @@ int server_send_response(server_handle_t server, connection_t* conn,
       break;
   }
 
-  /* 1. Format status line */
   int len = snprintf(head + hlen, sizeof(head) - hlen, "HTTP/1.1 %d %s\r\n",
-                     response->status_code, status_text);
+                     status_code, status_text);
   if (len < 0) return -1;
-  hlen += len;
+  hlen += (size_t)len;
 
-  /* 2. Format custom headers */
   if (response->headers) {
     size_t count = response->header_count;
     if (count > 64) count = 64;
@@ -791,39 +883,76 @@ int server_send_response(server_handle_t server, connection_t* conn,
       len = snprintf(head + hlen, sizeof(head) - hlen, "%s: %s\r\n",
                      response->headers[i], response->headers[i + 1]);
       if (len < 0) return -1;
-      hlen += len;
+      hlen += (size_t)len;
     }
   }
 
-  /* 3. Format Content-Length and blank line */
   len = snprintf(head + hlen, sizeof(head) - hlen,
                  "Content-Length: %zu\r\n\r\n", response->body_len);
   if (len < 0) return -1;
-  hlen += len;
+  hlen += (size_t)len;
 
-  /* 4. Write headers */
-  if (server_write(server, conn, head, hlen) < 0) return -1;
+  /* 2. Try single WSASend: copy headers + body into one send buffer.
+   * Saves 1 malloc + 1 memcpy + 1 send-queue traversal per response vs
+   * the previous headers-then-body double server_write path. */
+  iocp_overlapped_t* ov = (iocp_overlapped_t*)malloc(sizeof(iocp_overlapped_t));
+  if (!ov) goto fallback;
+  memset(ov, 0, sizeof(iocp_overlapped_t));
+  ov->type = OP_SEND;
+  ov->conn = conn;
 
-  /* 5. Write body if present */
-  if (response->body && response->body_len > 0) {
-    if (server_write(server, conn, response->body, response->body_len) < 0)
-      return -1;
+  size_t total = hlen;
+  if (total > BUFFER_SIZE) {
+    free(ov);
+    goto fallback;
+  }
+  memcpy(ov->buffer, head, total);
+
+  if (response->body && response->body_len > 0 &&
+      total + response->body_len <= BUFFER_SIZE) {
+    memcpy(ov->buffer + total, response->body, response->body_len);
+    total += response->body_len;
+  }
+
+  ov->wsabuf.buf = ov->buffer;
+  ov->wsabuf.len = (ULONG)total;
+
+  DWORD sent = 0;
+  if (WSASend((SOCKET)conn->fd, &ov->wsabuf, 1, &sent, 0, &ov->overlapped,
+              NULL) == SOCKET_ERROR &&
+      WSAGetLastError() != WSA_IO_PENDING) {
+    free(ov);
+    return -1;
   }
 
   conn->headers_sent = true;
 
-  /* If all data has been sent immediately and keep_alive is false, close
-   * connection. Otherwise, if keep_alive is true and nothing is in out_buffer,
-   * reset. Note: server_write appends to out_buffer, so if out_buffer_len == 0
-   * it means it completed synchronously. */
-  if (conn->out_buffer_len == 0) {
-    if (!conn->keep_alive) {
-      close_connection(&server->ctx, (SOCKET)conn->fd);
-    } else {
-      reset_connection(conn);
-    }
+  /* If body didn't fit in single send, send remainder separately */
+  if (response->body && response->body_len > 0 &&
+      total < hlen + response->body_len) {
+    size_t already = total - hlen;
+    server_write(server, conn, response->body + already,
+                 response->body_len - already);
   }
 
+  goto done;
+
+fallback:
+  if (server_write(server, conn, head, hlen) < 0) return -1;
+  if (response->body && response->body_len > 0)
+    if (server_write(server, conn, response->body, response->body_len) < 0)
+      return -1;
+  conn->headers_sent = true;
+
+done:
+  /* Re-arm RECV for pipelining (deferred by setting processing=true
+   * in the OP_RECV handler). Safe even if data is still buffered for send
+   * — recv uses conn->buffer, send uses conn->out_buffer.
+   * Sets recv_armed=true to prevent a double re-arm in the OP_RECV
+   * handler's fallthrough code. */
+  if (conn->keep_alive && conn->fd != (int)INVALID_SOCKET && !conn->closed) {
+    server_resume_read(server, conn);
+  }
   return 0;
 }
 
@@ -911,16 +1040,23 @@ int server_pause_read(server_handle_t server, connection_t* conn) {
 int server_resume_read(server_handle_t server, connection_t* conn) {
   if (!server || !conn || conn->fd == (int)INVALID_SOCKET) return -1;
   conn->processing = false;
-  /* Re-arm RECV immediately when resuming */
+  /* Re-arm RECV immediately when resuming.
+   * Use conn->buffer + conn->buffer_len as the read target so we don't
+   * overwrite any NEED_MORE data accumulated from a prior partial read. */
   iocp_overlapped_t* ov = (iocp_overlapped_t*)conn->platform_sqe_data_recv;
   if (ov) {
     memset(&ov->overlapped, 0, sizeof(OVERLAPPED));
-    ov->wsabuf.buf = conn->buffer;
-    ov->wsabuf.len = (ULONG)conn->buffer_cap;
+    ov->wsabuf.buf = conn->buffer + conn->buffer_len;
+    ov->wsabuf.len = (ULONG)(conn->buffer_cap - conn->buffer_len);
     DWORD received = 0;
     DWORD flags = 0;
-    WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,
-            &ov->overlapped, NULL);
+    if (WSARecv((SOCKET)conn->fd, &ov->wsabuf, 1, &received, &flags,
+                &ov->overlapped, NULL) == SOCKET_ERROR &&
+        WSAGetLastError() != WSA_IO_PENDING) {
+      close_connection((iocp_context_t*)server, (SOCKET)conn->fd);
+      return -1;
+    }
+    conn->recv_armed = true;
   }
   return 0;
 }
@@ -973,6 +1109,6 @@ connection_t* server_get_connection_by_fd(server_handle_t server, int fd) {
 
 const char* server_get_platform(void) { return "iocp"; }
 
-const char* server_get_version(void) { return "1.1.0"; }
+const char* server_get_version(void) { return "1.0.5"; }
 
 #endif
