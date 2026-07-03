@@ -297,6 +297,18 @@ static connection_t* get_connection(connection_t* pool, size_t pool_size,
   if (fd < 0 || (size_t)fd >= pool_size) return NULL;
   connection_t* conn = &pool[fd];
   if (conn->fd == -1) {
+    /* Slot reuse: a previous connection on this fd was closed and left
+     * the SQE data structures (now with ptr=NULL) in place. Free them
+     * before allocating fresh ones. */
+    if (conn->platform_sqe_data_recv) {
+      free(conn->platform_sqe_data_recv);
+      conn->platform_sqe_data_recv = NULL;
+    }
+    if (conn->platform_sqe_data_send) {
+      free(conn->platform_sqe_data_send);
+      conn->platform_sqe_data_send = NULL;
+    }
+
     memset(conn, 0, sizeof(*conn));
     conn->fd = fd;
     conn->buffer_cap = DEFAULT_INITIAL_BUFFER_SIZE;
@@ -362,13 +374,23 @@ static void close_connection(uring_context_t* ctx, int fd) {
     }
     conn->buffer_cap = 0;
 
-    /* Cleanup platform_sqe_data */
+    /* Mark the SQE user_data as closed (set ptr = NULL) so any in-flight
+     * CQE for this connection becomes a no-op in the event loop. Do NOT
+     * free the uring_data_t here — a previously-submitted SQE for this
+     * connection may still have its CQE pending in the ring, and freeing
+     * now would create a use-after-free when the event loop harvests it.
+     * The data is freed at one of three safe points:
+     *   1. get_connection() reuses the slot (frees the old data first)
+     *   2. server_stop() walks all slots after io_uring_queue_exit
+     *   3. (theoretically) never, if the slot is never reused; in that
+     *      case the data is bounded by MAX_CONNECTIONS (100K) * 16 bytes
+     *      ~= 1.6 MB, which is acceptable for the server's lifetime. */
     if (conn->platform_sqe_data_recv) {
-      free(conn->platform_sqe_data_recv);
+      ((uring_data_t*)conn->platform_sqe_data_recv)->ptr = NULL;
       conn->platform_sqe_data_recv = NULL;
     }
     if (conn->platform_sqe_data_send) {
-      free(conn->platform_sqe_data_send);
+      ((uring_data_t*)conn->platform_sqe_data_send)->ptr = NULL;
       conn->platform_sqe_data_send = NULL;
     }
 
@@ -592,12 +614,19 @@ static void handle_send_completion(uring_context_t* ctx, connection_t* conn,
     conn->out_buffer_pos = 0;
     conn->out_buffer_len = 0;
 
-    /* Handle keep-alive/reset */
+    /* Handle keep-alive/reset
+     *
+     * Do NOT call reset_connection() here — the read buffer state
+     * (buffer_len, buffer_pos, body_remaining, request_complete) may
+     * already hold a pipelined next request that was received while the
+     * response was being sent. reset_connection() would wipe that data.
+     * The read-side state is reset lazily in handle_recv_completion at
+     * the start of each parse cycle (see PARSE_STATUS_DONE branch).
+     * Mirrors the IOCP post-fix pattern at server_iocp.c:643-651. */
     if (conn->request_complete && conn->headers_sent) {
       if (!conn->keep_alive) {
         close_connection(ctx, conn->fd);
       } else {
-        reset_connection(conn);
         arm_recv(ctx, conn);
       }
     }
@@ -623,12 +652,16 @@ int server_resume_read(server_handle_t server, connection_t* conn) {
 
 static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
                                    int bytes_read) {
-  if (conn->processing) return;
   if (bytes_read <= 0) {
     close_connection(ctx, conn->fd);
     return;
   }
   conn->buffer_len += bytes_read;
+
+  /* If the JS layer is currently processing this connection, we still need
+   * to accumulate the bytes (so server_resume_read can arm a new RECV at
+   * the correct offset), but we skip parsing. Mirrors the IOCP pattern. */
+  if (conn->processing) return;
 
   parse_result_t result;
   int status = http_parse_request(conn->buffer, conn->buffer_len, &result);
@@ -653,6 +686,17 @@ static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
     conn->request_complete = true;
     conn->keep_alive = result.http_minor >= 1;
 
+    /* Lazily reset the read buffer for the next request.
+     *
+     * The parser produced `result.bytes_consumed` worth of bytes for this
+     * request. We use the simpler `buffer_len = 0` strategy (rather than
+     * memmove'ing unconsumed bytes) because the io_uring recv buffer is
+     * private to this connection and the next arm_recv will read fresh
+     * bytes at offset 0. Matches the IOCP post-fix pattern at
+     * server_iocp.c:569. */
+    conn->buffer_len = 0;
+    conn->buffer_pos = 0;
+
     /* ULTRA FAST PATH: Check dynamic fast router first */
     uint8_t* fast_response = NULL;
     size_t fast_response_len = 0;
@@ -668,6 +712,27 @@ static void handle_recv_completion(uring_context_t* ctx, connection_t* conn,
     }
 
     if (ctx->on_request) {
+      /* Note: we deliberately do NOT set conn->processing = true here.
+       *
+       * The processing flag is only useful when server_pause_read() and
+       * server_resume_read() are called from the JS layer to coordinate
+       * the C event thread with the JS handler. The current binding.c
+       * (see src/binding.c) never calls these — the JS handler runs
+       * asynchronously via napi_threadsafe_function, and the C event
+       * thread does not re-arm RECV in handle_recv_completion after
+       * on_request() returns (the only paths that re-arm are NEED_MORE
+       * and handle_send_completion's keep-alive path, neither of which
+       * fires while the JS handler is still reading the current result).
+       *
+       * Setting processing=true here without a corresponding
+       * server_resume_read() would leave it stuck at true, and the next
+       * CQE's accumulated bytes would never be parsed — a timeout.
+       *
+       * If a future change to binding.c starts calling server_pause_read
+       * and server_resume_read, the processing flag will need to be set
+       * here, and the F4 ownership model (data->ptr sentinel) plus the
+       * recv_armed coordination in server_resume_read must be added to
+       * avoid the same kind of stuck-connection bug. */
       ctx->on_request(conn, &result, ctx->user_data);
     }
   }
@@ -699,13 +764,25 @@ static void* event_loop_thread(void* arg) {
     if (data) {
       switch (data->type) {
         case OP_ACCEPT:
+          /* Accept CQEs use the kernel-returned fd (cqe->res), not
+           * data->ptr (which is always NULL for accept). The accept
+           * data is a static ctx member and does not need the ptr
+           * sentinel. */
           handle_new_connection(ctx, res);
           break;
         case OP_RECV:
-          handle_recv_completion(ctx, (connection_t*)data->ptr, res);
-          break;
         case OP_SEND:
-          handle_send_completion(ctx, (connection_t*)data->ptr, res);
+          /* If close_connection() ran for this connection, data->ptr
+           * was set to NULL by close_connection (see F4 fix). The
+           * pending CQE is for a now-closed connection; skip the
+           * handler to avoid a use-after-free on conn->buffer. */
+          if (data->ptr) {
+            if (data->type == OP_RECV) {
+              handle_recv_completion(ctx, (connection_t*)data->ptr, res);
+            } else {
+              handle_send_completion(ctx, (connection_t*)data->ptr, res);
+            }
+          }
           break;
       }
     }
@@ -837,6 +914,24 @@ int server_stop(server_handle_t server, uint32_t timeout_ms) {
   pthread_join(ctx->event_thread, NULL);
 
   io_uring_queue_exit(&ctx->ring);
+
+  /* Free any SQE data structures left on closed connections. Safe here
+   * because the event thread has joined and the ring is torn down, so
+   * no CQE will ever be harvested again. */
+  for (size_t i = 0; i < ctx->max_connections; i++) {
+    if (ctx->connections[i].platform_sqe_data_recv) {
+      free(ctx->connections[i].platform_sqe_data_recv);
+      ctx->connections[i].platform_sqe_data_recv = NULL;
+    }
+    if (ctx->connections[i].platform_sqe_data_send) {
+      free(ctx->connections[i].platform_sqe_data_send);
+      ctx->connections[i].platform_sqe_data_send = NULL;
+    }
+    if (ctx->connections[i].platform_ctx) {
+      free(ctx->connections[i].platform_ctx);
+      ctx->connections[i].platform_ctx = NULL;
+    }
+  }
 
   for (size_t i = 0; i < ctx->max_connections; i++) {
     if (ctx->connections[i].fd >= 0) {
