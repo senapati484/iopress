@@ -72,7 +72,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^26.0.1",
-    "autocannon": "^8.0.0",
+    "autocannon": "^9.0.0",
     "eslint": "^10.6.0",
     "express": "^5.2.1",
     "globals": "^17.4.0",
